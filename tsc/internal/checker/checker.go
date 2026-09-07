@@ -590,6 +590,7 @@ type Checker struct {
 	etsLibFiles                                 map[string]struct{}
 	throws                                      *throwsChecker
 	ohAvailableNodeChecks                       map[string]struct{}
+	ohSDKUseFacts                               map[string]map[string]OHSDKUseFact
 	files                                       []*ast.SourceFile
 	fileIndexMap                                map[*ast.SourceFile]int
 	compareSymbols                              func(*ast.Symbol, *ast.Symbol) int

@@ -751,6 +751,7 @@ export interface ArkTSTransformTypeFactsResponse {
     properties: ArkTSPropertyTypeFactsResponse[] | null;
     builderAccesses: ArkTSBuilderReceiverTypeFactsResponse[] | null;
     memberAccesses: ArkTSExpressionTypeFactsResponse[] | null;
+    sdkApiUses: ArkTSSDKApiUseResponse[] | null;
 }
 
 /** CheckerSymbolParams are parameters for checker methods that operate on a symbol. */
@@ -1537,6 +1538,11 @@ export interface ArkTSExpressionTypeFactsResponse {
     pos: number;
     end: number;
     type: ResolvedTypeIdentityResponse | null;
+}
+
+export interface ArkTSSDKApiUseResponse {
+    apiModule: string;
+    function: string;
 }
 
 /** CompletionEntryResponse represents a single completion item. */

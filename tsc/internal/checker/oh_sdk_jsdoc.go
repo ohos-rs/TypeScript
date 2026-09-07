@@ -52,6 +52,31 @@ type ohSDKJSDocContract struct {
 	tags []ohSDKJSDocTag
 }
 
+// OHSDKUseFact is the declaration identity observed by
+// api_check_utils.ts::checkCrossplatformValue. The consumer applies the
+// SDK-owned crossplatform dependency configuration; the checker alone owns
+// symbol/overload/type resolution.
+type OHSDKUseFact struct {
+	FileName  string
+	ApiModule string
+	Function  string
+}
+
+func (c *Checker) OHSDKUseFacts(fileName string) []OHSDKUseFact {
+	facts := c.ohSDKUseFacts[tspath.NormalizePath(fileName)]
+	result := make([]OHSDKUseFact, 0, len(facts))
+	for _, fact := range facts {
+		result = append(result, fact)
+	}
+	slices.SortFunc(result, func(left OHSDKUseFact, right OHSDKUseFact) int {
+		if byModule := strings.Compare(left.ApiModule, right.ApiModule); byModule != 0 {
+			return byModule
+		}
+		return strings.Compare(left.Function, right.Function)
+	})
+	return result
+}
+
 func (c *Checker) checkOHSDKIdentifierUse(node *ast.Node, symbol *ast.Symbol) {
 	if node == nil || node.Virtual || symbol == nil || symbol.ValueDeclaration == nil {
 		return
@@ -99,6 +124,9 @@ func (c *Checker) checkOHSDKDeclarationUse(node *ast.Node, declaration *ast.Node
 	if !c.ohSDKNodeNeedsCheck(useFile.FileName(), declarationFile.FileName(), isProjectAvailable, isSDK) {
 		return
 	}
+	if isSDK && c.compilerOptions.OhCrossplatform.IsTrue() {
+		c.recordOHSDKUse(node, declaration)
+	}
 	if c.ohNeedsArkUIFindModuleWarning(useFile.FileName(), declarationFile.FileName()) {
 		c.addOHSDKUseDiagnostic(node, ohFindModuleWarning, diagnostics.CategoryWarning)
 	}
@@ -111,6 +139,84 @@ func (c *Checker) checkOHSDKDeclarationUse(node *ast.Node, declaration *ast.Node
 	c.checkOHSyscapUse(node, contract)
 	c.checkOHPermissionUse(node, contract)
 	c.checkOHPresenceTags(node, contract)
+}
+
+func (c *Checker) recordOHSDKUse(node *ast.Node, declaration *ast.Node) {
+	function := ohSDKAPIPath(declaration)
+	if function == "" {
+		return
+	}
+	useFile := tspath.NormalizePath(ast.GetSourceFileOfNode(node).FileName())
+	declarationFile := tspath.NormalizePath(ast.GetSourceFileOfNode(declaration).FileName())
+	apiModule := filepath.Base(declarationFile)
+	apiModule = strings.TrimSuffix(strings.TrimSuffix(apiModule, ".d.ets"), ".d.ts")
+	fact := OHSDKUseFact{FileName: useFile, ApiModule: apiModule, Function: function}
+	if c.ohSDKUseFacts == nil {
+		c.ohSDKUseFacts = make(map[string]map[string]OHSDKUseFact)
+	}
+	if c.ohSDKUseFacts[useFile] == nil {
+		c.ohSDKUseFacts[useFile] = make(map[string]OHSDKUseFact)
+	}
+	c.ohSDKUseFacts[useFile][apiModule+"\x00"+function] = fact
+}
+
+// Exact port of api_check_utils.ts::getApiPathFromNode/getApiNodeName.
+func ohSDKAPIPath(declaration *ast.Node) string {
+	parts := make([]string, 0, 4)
+	for current := declaration; current != nil && !ast.IsSourceFile(current) && ohSDKAPINodeKind(current.Kind); current = current.Parent {
+		name := ohSDKAPINodeName(current)
+		if name != "" {
+			parts = append(parts, name)
+		}
+	}
+	slices.Reverse(parts)
+	return strings.Join(parts, "#")
+}
+
+func ohSDKAPINodeKind(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindVariableStatement,
+		ast.KindMethodDeclaration,
+		ast.KindMethodSignature,
+		ast.KindFunctionDeclaration,
+		ast.KindConstructor,
+		ast.KindConstructSignature,
+		ast.KindCallSignature,
+		ast.KindPropertyDeclaration,
+		ast.KindPropertySignature,
+		ast.KindEnumMember,
+		ast.KindEnumDeclaration,
+		ast.KindTypeAliasDeclaration,
+		ast.KindClassDeclaration,
+		ast.KindInterfaceDeclaration,
+		ast.KindModuleDeclaration,
+		ast.KindGetAccessor,
+		ast.KindSetAccessor,
+		ast.KindIndexSignature:
+		return true
+	default:
+		return false
+	}
+}
+
+func ohSDKAPINodeName(node *ast.Node) string {
+	switch node.Kind {
+	case ast.KindConstructor, ast.KindConstructSignature, ast.KindCallSignature:
+		return "constructor"
+	case ast.KindVariableStatement:
+		declarations := node.AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes
+		if len(declarations) == 1 && declarations[0].Name() != nil {
+			return scanner.GetTextOfNode(declarations[0].Name())
+		}
+		return "unnamed"
+	case ast.KindIndexSignature:
+		return "unnamed"
+	default:
+		if node.Name() != nil {
+			return scanner.GetTextOfNode(node.Name())
+		}
+		return "unnamed"
+	}
 }
 
 func (c *Checker) ohNeedsArkUIFindModuleWarning(useFile string, declarationFile string) bool {

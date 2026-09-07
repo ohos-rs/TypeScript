@@ -14,6 +14,12 @@ type ArkTSTransformTypeFactsResponse struct {
 	Properties      []*ArkTSPropertyTypeFactsResponse        `json:"properties"`
 	BuilderAccesses []*ArkTSBuilderReceiverTypeFactsResponse `json:"builderAccesses"`
 	MemberAccesses  []*ArkTSExpressionTypeFactsResponse      `json:"memberAccesses"`
+	SDKApiUses      []*ArkTSSDKApiUseResponse                `json:"sdkApiUses"`
+}
+
+type ArkTSSDKApiUseResponse struct {
+	ApiModule string `json:"apiModule"`
+	Function  string `json:"function"`
 }
 
 type ArkTSPropertyTypeFactsResponse struct {
@@ -85,18 +91,29 @@ func (s *Session) handleGetArkTSTransformTypeFacts(ctx context.Context, params *
 		if sourceFile == nil {
 			continue
 		}
-		result = append(result, setup.arkTSTransformTypeFactsResponse(sourceFile))
+		result = append(result, setup.arkTSTransformTypeFactsResponse(ctx, sourceFile))
 	}
 	return result, nil
 }
 
-func (setup checkerSetup) arkTSTransformTypeFactsResponse(sourceFile *ast.SourceFile) *ArkTSTransformTypeFactsResponse {
+func (setup checkerSetup) arkTSTransformTypeFactsResponse(ctx context.Context, sourceFile *ast.SourceFile) *ArkTSTransformTypeFactsResponse {
+	// checker.ts invokes checkCrossplatformValue while checking resolved SDK
+	// declarations. Run that same checker path before snapshotting the callback
+	// facts; AST traversal alone cannot reproduce overload and return-type use.
+	setup.checker.GetDiagnostics(ctx, sourceFile)
 	positions := sourceFile.GetPositionMap()
 	response := &ArkTSTransformTypeFactsResponse{
 		FileName:        sourceFile.FileName(),
 		Properties:      make([]*ArkTSPropertyTypeFactsResponse, 0),
 		BuilderAccesses: make([]*ArkTSBuilderReceiverTypeFactsResponse, 0),
 		MemberAccesses:  make([]*ArkTSExpressionTypeFactsResponse, 0),
+		SDKApiUses:      make([]*ArkTSSDKApiUseResponse, 0),
+	}
+	for _, fact := range setup.checker.OHSDKUseFacts(sourceFile.FileName()) {
+		response.SDKApiUses = append(response.SDKApiUses, &ArkTSSDKApiUseResponse{
+			ApiModule: fact.ApiModule,
+			Function:  fact.Function,
+		})
 	}
 	var visit func(*ast.Node) bool
 	visit = func(node *ast.Node) bool {

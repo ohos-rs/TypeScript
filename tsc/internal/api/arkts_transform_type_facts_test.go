@@ -10,7 +10,12 @@ import (
 
 func TestArkTSTransformTypeFactsAPI(t *testing.T) {
 	const file = "/entry.ets"
+	const sdk = "/sdk/@ohos.sample.d.ts"
 	ps, _ := projecttestutil.Setup(map[string]any{
+		sdk: `declare namespace sample {
+/** @crossplatform */ interface Client { /** @crossplatform */ run(): void; }
+/** @crossplatform */ function create(): Client;
+}`,
 		file: `class MutableBuilder { builder(): void {} }
 type PrimitiveAlias = string | number;
 type BuilderAlias = MutableBuilder;
@@ -18,7 +23,7 @@ enum Color { Red }
 class Holder {
   simple: PrimitiveAlias = "value";
   content: BuilderAlias = new MutableBuilder();
-  build() { this.content.builder(); const color = Color.Red; }
+  build() { this.content.builder(); const color = Color.Red; sample.create().run(); }
 }`,
 	})
 	defer ps.Close()
@@ -26,10 +31,12 @@ class Holder {
 	defer s.Close()
 	ctx := t.Context()
 	created, err := s.handleCreateProgram(ctx, &CreateProgramParams{
-		RootFiles: []DocumentIdentifier{{FileName: file}},
+		RootFiles: []DocumentIdentifier{{FileName: sdk}, {FileName: file}},
 		CreateProgramOptions: CreateProgramOptions{CompilerOptions: core.CompilerOptions{
 			NoEmit:               core.TSTrue,
 			EtsAnnotationsEnable: core.TSTrue,
+			OhCrossplatform:      core.TSTrue,
+			OhAllModulePaths:     []string{sdk},
 		}},
 	})
 	assert.NilError(t, err)
@@ -46,6 +53,17 @@ class Holder {
 	assert.Assert(t, infos[0].Properties[0].Type.Types[1].IsBasic)
 	assert.Equal(t, len(infos[0].BuilderAccesses), 1)
 	assert.Equal(t, infos[0].BuilderAccesses[0].ReceiverType.SymbolName, "MutableBuilder")
-	assert.Equal(t, len(infos[0].MemberAccesses), 1)
-	assert.Assert(t, infos[0].MemberAccesses[0].Type.IsEnum)
+	assert.Equal(t, len(infos[0].MemberAccesses), 2)
+	enumMembers := 0
+	for _, access := range infos[0].MemberAccesses {
+		if access.Type.IsEnum {
+			enumMembers++
+		}
+	}
+	assert.Equal(t, enumMembers, 1)
+	assert.Equal(t, len(infos[0].SDKApiUses), 3)
+	assert.Equal(t, infos[0].SDKApiUses[0].ApiModule, "@ohos.sample")
+	assert.Equal(t, infos[0].SDKApiUses[0].Function, "Client#run")
+	assert.Equal(t, infos[0].SDKApiUses[1].Function, "create")
+	assert.Equal(t, infos[0].SDKApiUses[2].Function, "sample")
 }

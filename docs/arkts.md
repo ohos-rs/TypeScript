@@ -141,10 +141,14 @@ returns the checker-owned import disposition and direct class/method runtime
 retention decision used by OH `ohApi.ts::transformAnnotation`.
 `getArkTSTransformTypeFacts` batches the resolved property types, `.builder`
 receiver identities, and direct identifier-member types consumed by
-`process_component_member.ts` and `process_component_build.ts`. Its type-kind
-fields are semantic booleans rather than the compiler's internal `TypeFlags`
-numbers: the current TSGO and OH TypeScript layouts are different, so exposing
-raw bits would make a native consumer silently apply the wrong ArkTS rule.
+`process_component_member.ts` and `process_component_build.ts`. It also returns
+the SDK declaration module/function identities observed at
+`api_check_utils.ts::checkCrossplatformValue`, allowing a native build host to
+apply `depsModuleConfig` without reconstructing overload, alias, fluent-return,
+or JSDoc resolution outside TypeScript. Its type-kind fields are semantic
+booleans rather than the compiler's internal `TypeFlags` numbers: the current
+TSGO and OH TypeScript layouts are different, so exposing raw bits would make a
+native consumer silently apply the wrong ArkTS rule.
 
 OH `checker.ts::resolveExternalModule/allowImportSendable` import checks are
 implemented for `.so` (warning 28014) and TS-to-ETS imports (28016/28017).
