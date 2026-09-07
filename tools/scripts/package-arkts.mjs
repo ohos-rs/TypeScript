@@ -4,9 +4,12 @@ import {
     copyFileSync,
     existsSync,
     mkdirSync,
+    mkdtempSync,
     readFileSync,
+    rmSync,
     writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import {
     dirname,
     join,
@@ -56,11 +59,31 @@ for (const target of targets) {
     const binary = target.os === "windows" ? "tsc.exe" : "tsc";
     const args = ["build", "-p", "2", "-trimpath", "-ldflags=-s -w", "-o", join(directory, binary), "./tsc/cmd/tsc"];
     console.log(`Building ${target.name}`);
-    execFileSync("go", args, {
-        cwd: root,
-        stdio: "inherit",
-        env: { ...process.env, CGO_ENABLED: "0", GOOS: target.os, GOARCH: target.arch },
-    });
+    // Cross-target Go caches are not reusable and retaining all three at once
+    // can consume several gigabytes. Keep each build isolated and reclaim only
+    // this script's cache when the target finishes.
+    const buildTemp = mkdtempSync(join(tmpdir(), "tsgo-arkts-build-"));
+    const goCache = join(buildTemp, "cache");
+    const goTemp = join(buildTemp, "tmp");
+    mkdirSync(goCache);
+    mkdirSync(goTemp);
+    try {
+        execFileSync("go", args, {
+            cwd: root,
+            stdio: "inherit",
+            env: {
+                ...process.env,
+                CGO_ENABLED: "0",
+                GOOS: target.os,
+                GOARCH: target.arch,
+                GOCACHE: goCache,
+                GOTMPDIR: goTemp,
+            },
+        });
+    }
+    finally {
+        rmSync(buildTemp, { recursive: true, force: true });
+    }
     copyFileSync(join(root, "LICENSE.txt"), join(directory, "LICENSE.txt"));
     copyFileSync(join(root, "NOTICE.txt"), join(directory, "NOTICE.txt"));
     copyFileSync(join(root, "docs/arkts.md"), join(directory, "ARKTS.md"));

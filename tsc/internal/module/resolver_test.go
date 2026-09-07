@@ -371,6 +371,47 @@ func TestResolveModuleNameFromOhModules(t *testing.T) {
 	}
 }
 
+// OpenHarmony moduleNameResolver.ts::tryAddingExtensions checks .ets before
+// .ts/.d.ts when compilerOptions.ets is enabled. Packages such as Hypium ship
+// all three beside a JavaScript main entry and expose their ArkTS API only from
+// index.ets.
+func TestResolveOhModulePrefersEtsPackageMain(t *testing.T) {
+	t.Parallel()
+
+	fs := vfstest.FromMap(map[string]string{
+		"/repo/oh_modules/@ohos/hypium/oh-package.json5": `{name:'@ohos/hypium',version:'1.0.0',main:'index.js'}`,
+		"/repo/oh_modules/@ohos/hypium/index.ets":        "export const Hypium = 1; export const expect = 2;",
+		"/repo/oh_modules/@ohos/hypium/index.ts":         "export const describe = 1;",
+		"/repo/oh_modules/@ohos/hypium/index.d.ts":       "export declare const wrong: string;",
+		"/repo/oh_modules/@ohos/hypium/index.js":         "exports.Hypium = 1;",
+		"/repo/src/file.ets":                             "",
+	}, true)
+	host := &resolutionHostStub{fs: fs, cwd: "/repo"}
+	opts := &core.CompilerOptions{
+		ModuleResolution:   core.ModuleResolutionKindBundler,
+		Module:             core.ModuleKindESNext,
+		Target:             core.ScriptTargetESNext,
+		PackageManagerType: "ohpm",
+	}
+	resolver := module.NewResolver(host, opts, "", "", nil)
+
+	resolved, _ := resolver.ResolveModuleName("@ohos/hypium", "/repo/src/file.ets", core.ModuleKindESNext, nil)
+	if !resolved.IsResolved() {
+		t.Fatal("OHPM package failed to resolve")
+	}
+	if got, want := resolved.ResolvedFileName, "/repo/oh_modules/@ohos/hypium/index.ets"; got != want {
+		t.Fatalf("resolved file = %q, want %q", got, want)
+	}
+
+	resolved, _ = resolver.ResolveModuleName("./index.ts", "/repo/oh_modules/@ohos/hypium/index.ets", core.ModuleKindESNext, nil)
+	if !resolved.IsResolved() {
+		t.Fatal("explicit TypeScript re-export failed to resolve")
+	}
+	if got, want := resolved.ResolvedFileName, "/repo/oh_modules/@ohos/hypium/index.ts"; got != want {
+		t.Fatalf("explicit TypeScript re-export resolved to %q, want %q", got, want)
+	}
+}
+
 func TestParseOhModuleFromPath(t *testing.T) {
 	t.Parallel()
 

@@ -1715,26 +1715,58 @@ func (r *resolutionState) tryAddingExtensions(extensionless string, extensions e
 			return r.tryExtension(tspath.ExtensionDets, extensionless, true)
 		}
 		return continueSearching()
-	case tspath.ExtensionTs, tspath.ExtensionDts, tspath.ExtensionJs, "":
+	case tspath.ExtensionTs, tspath.ExtensionDts:
+		// ets_checker.ts::resolveModuleNames resolves an explicit .ts specifier
+		// through its exact-file fallback. Do not let ArkTS extension preference
+		// redirect `./index.ts` back to an adjacent index.ets.
 		if extensions&extensionsTypeScript != 0 {
-			if resolved := r.tryExtension(tspath.ExtensionTs, extensionless, originalExtension == tspath.ExtensionTs || originalExtension == tspath.ExtensionDts); !resolved.shouldContinueSearching() {
+			if resolved := r.tryExtension(tspath.ExtensionTs, extensionless, true); !resolved.shouldContinueSearching() {
 				return resolved
 			}
-			if resolved := r.tryExtension(tspath.ExtensionTsx, extensionless, originalExtension == tspath.ExtensionTs || originalExtension == tspath.ExtensionDts); !resolved.shouldContinueSearching() {
+			if resolved := r.tryExtension(tspath.ExtensionTsx, extensionless, true); !resolved.shouldContinueSearching() {
 				return resolved
 			}
 		}
 		if extensions&extensionsDeclaration != 0 {
-			if resolved := r.tryExtension(tspath.ExtensionDts, extensionless, originalExtension == tspath.ExtensionTs || originalExtension == tspath.ExtensionDts); !resolved.shouldContinueSearching() {
+			if resolved := r.tryExtension(tspath.ExtensionDts, extensionless, true); !resolved.shouldContinueSearching() {
 				return resolved
 			}
 		}
+		return continueSearching()
+	case tspath.ExtensionJs, "":
+		// OpenHarmony moduleNameResolver.ts::tryAddingExtensions gives ArkTS
+		// implementation and declaration files precedence whenever compilerOptions.ets
+		// is enabled. In particular, a package `main: "index.js"` must resolve to
+		// index.ets before an adjacent index.ts/index.d.ts (Hypium relies on this).
 		if r.supportsEts && extensions&extensionsTypeScript != 0 {
 			if resolved := r.tryExtension(tspath.ExtensionEts, extensionless, false); !resolved.shouldContinueSearching() {
 				return resolved
 			}
 		}
+		if extensions&extensionsTypeScript != 0 {
+			if resolved := r.tryExtension(tspath.ExtensionTs, extensionless, false); !resolved.shouldContinueSearching() {
+				return resolved
+			}
+			if resolved := r.tryExtension(tspath.ExtensionTsx, extensionless, false); !resolved.shouldContinueSearching() {
+				return resolved
+			}
+		}
 		if r.supportsEts && extensions&extensionsDeclaration != 0 {
+			if resolved := r.tryExtension(tspath.ExtensionDets, extensionless, false); !resolved.shouldContinueSearching() {
+				return resolved
+			}
+		}
+		if extensions&extensionsDeclaration != 0 {
+			if resolved := r.tryExtension(tspath.ExtensionDts, extensionless, false); !resolved.shouldContinueSearching() {
+				return resolved
+			}
+		}
+		if !r.supportsEts && extensions&extensionsTypeScript != 0 {
+			if resolved := r.tryExtension(tspath.ExtensionEts, extensionless, false); !resolved.shouldContinueSearching() {
+				return resolved
+			}
+		}
+		if !r.supportsEts && extensions&extensionsDeclaration != 0 {
 			if resolved := r.tryExtension(tspath.ExtensionDets, extensionless, false); !resolved.shouldContinueSearching() {
 				return resolved
 			}
