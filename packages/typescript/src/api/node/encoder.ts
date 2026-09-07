@@ -13,13 +13,14 @@ import {
     getNodeDataType,
 } from "./encoder.generated.ts";
 import { MsgpackWriter } from "./msgpack.ts";
+import type { RemoteSourceFile } from "./node.ts";
 import {
     childProperties,
+    HEADER_OFFSET_ETS_OPTIONS,
     HEADER_OFFSET_EXTENDED_DATA,
     HEADER_OFFSET_METADATA,
     HEADER_OFFSET_NODES,
     HEADER_OFFSET_PARSE_OPTIONS,
-    HEADER_OFFSET_ETS_OPTIONS,
     HEADER_OFFSET_STRING_TABLE,
     HEADER_OFFSET_STRING_TABLE_OFFSETS,
     HEADER_OFFSET_STRUCTURED_DATA,
@@ -197,7 +198,7 @@ function isNodeArray(value: any): value is NodeArray<Node> {
 /**
  * Encode a SourceFile AST node into the binary format.
  */
-export function encodeSourceFile(sourceFile: SourceFile): Uint8Array {
+export function encodeSourceFile(sourceFile: SourceFile | RemoteSourceFile): Uint8Array {
     return encodeNode(sourceFile);
 }
 

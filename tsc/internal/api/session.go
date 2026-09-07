@@ -879,6 +879,10 @@ func (s *Session) HandleRequest(ctx context.Context, method string, params json.
 		return s.handleGetConstantValue(ctx, parsed.(*CheckerNodeParams))
 	case string(MethodGetAnnotationInfo):
 		return s.handleGetAnnotationInfo(ctx, parsed.(*CheckerNodeParams))
+	case string(MethodGetAnnotationTransformInfos):
+		return s.handleGetAnnotationTransformInfos(ctx, parsed.(*SelectedFilesEmitParams))
+	case string(MethodGetArkTSTransformTypeFacts):
+		return s.handleGetArkTSTransformTypeFacts(ctx, parsed.(*SelectedFilesEmitParams))
 	case string(MethodGetSignatureFromDeclaration):
 		return s.handleGetSignatureFromDeclaration(ctx, parsed.(*CheckerNodeParams))
 	case string(MethodGetExportSpecifierLocalTarget):

@@ -114,6 +114,8 @@ export interface APIMethodInfo {
     getFalseTypeOfConditionalType: APIMethod<GetTypePropertyParams, TypeResponse>;
     getConstantValue: APIMethod<CheckerNodeParams, unknown | null>;
     getAnnotationInfo: APIMethod<CheckerNodeParams, AnnotationInfoResponse | null>;
+    getAnnotationTransformInfos: APIMethod<SelectedFilesEmitParams, AnnotationTransformInfoResponse[]>;
+    getArkTSTransformTypeFacts: APIMethod<SelectedFilesEmitParams, ArkTSTransformTypeFactsResponse[]>;
     getSignatureFromDeclaration: APIMethod<CheckerNodeParams, SignatureResponse>;
     getExportSpecifierLocalTargetSymbol: APIMethod<CheckerNodeParams, SymbolResponse | null>;
     getAliasedSymbol: APIMethod<CheckerSymbolParams, SymbolResponse>;
@@ -727,6 +729,30 @@ export interface AnnotationInfoResponse {
     properties: AnnotationPropertyResponse[] | null;
 }
 
+export interface SelectedFilesEmitParams {
+    snapshot: number;
+    project: string;
+    files: readonly DocumentIdentifier[] | null;
+}
+
+export interface AnnotationTransformInfoResponse {
+    fileName: string;
+    declarations: AnnotationTransformNodeResponse[] | null;
+    uses: AnnotationTransformNodeResponse[] | null;
+    imports: AnnotationTransformImportResponse[] | null;
+}
+
+/**
+ * ArkTSTransformTypeFactsResponse contains checker results only. The native
+ * consumer owns all emitted syntax and applies ets2bundle's transform rules.
+ */
+export interface ArkTSTransformTypeFactsResponse {
+    fileName: string;
+    properties: ArkTSPropertyTypeFactsResponse[] | null;
+    builderAccesses: ArkTSBuilderReceiverTypeFactsResponse[] | null;
+    memberAccesses: ArkTSExpressionTypeFactsResponse[] | null;
+}
+
 /** CheckerSymbolParams are parameters for checker methods that operate on a symbol. */
 export interface CheckerSymbolParams {
     snapshot: number;
@@ -881,12 +907,6 @@ export interface EmitOutputResponse {
     outputFiles: EmitOutputFile[];
 }
 
-export interface SelectedFilesEmitParams {
-    snapshot: number;
-    project: string;
-    files: readonly DocumentIdentifier[] | null;
-}
-
 /** GetIntrinsicTypeParams is used for intrinsic type getters (anyType, stringType, etc.). */
 export interface GetIntrinsicTypeParams {
     snapshot: number;
@@ -932,10 +952,12 @@ export interface BatchRequest {
         | "getAliasTypeArgumentsOfType"
         | "getAliasedSymbol"
         | "getAnnotationInfo"
+        | "getAnnotationTransformInfos"
         | "getAnyType"
         | "getApparentPropertiesOfType"
         | "getApparentType"
         | "getArkTSLinterDiagnostics"
+        | "getArkTSTransformTypeFacts"
         | "getBaseConstraintOfType"
         | "getBaseTypeOfLiteralType"
         | "getBaseTypeOfType"
@@ -1082,10 +1104,12 @@ export interface BatchResponse {
         | "getAliasTypeArgumentsOfType"
         | "getAliasedSymbol"
         | "getAnnotationInfo"
+        | "getAnnotationTransformInfos"
         | "getAnyType"
         | "getApparentPropertiesOfType"
         | "getApparentType"
         | "getArkTSLinterDiagnostics"
+        | "getArkTSTransformTypeFacts"
         | "getBaseConstraintOfType"
         | "getBaseTypeOfLiteralType"
         | "getBaseTypeOfType"
@@ -1471,6 +1495,7 @@ export interface ImportAdderAction {
 
 export interface AnnotationPropertyResponse {
     name: string;
+    nameText: string;
     declaration: string;
     type: TypeResponse | null;
     initializer: AnnotationConstantResponse | null;
@@ -1479,6 +1504,39 @@ export interface AnnotationPropertyResponse {
     elementType: TypeResponse | null;
     enumDeclaration?: string;
     enumFirstValue: AnnotationConstantResponse | null;
+    typeText: string;
+    elementTypeText: string;
+}
+
+export interface AnnotationTransformNodeResponse {
+    pos: number;
+    end: number;
+    runtimeRetained: boolean;
+    info: AnnotationInfoResponse | null;
+}
+
+export interface AnnotationTransformImportResponse {
+    pos: number;
+    end: number;
+    disposition: string;
+}
+
+export interface ArkTSPropertyTypeFactsResponse {
+    namePos: number;
+    nameEnd: number;
+    type?: ResolvedTypeIdentityResponse;
+}
+
+export interface ArkTSBuilderReceiverTypeFactsResponse {
+    pos: number;
+    end: number;
+    receiverType: ResolvedTypeIdentityResponse | null;
+}
+
+export interface ArkTSExpressionTypeFactsResponse {
+    pos: number;
+    end: number;
+    type: ResolvedTypeIdentityResponse | null;
 }
 
 /** CompletionEntryResponse represents a single completion item. */
@@ -1546,6 +1604,19 @@ export interface AnnotationConstantResponse {
     kind: string;
     value: string;
     items?: AnnotationConstantResponse[];
+}
+
+/**
+ * ResolvedTypeIdentityResponse is deliberately a value snapshot rather than
+ * an API object handle. One batched request therefore has no follow-up IPC and
+ * remains valid after the Program snapshot is released.
+ */
+export interface ResolvedTypeIdentityResponse {
+    isNullable: boolean;
+    isEnum: boolean;
+    isBasic: boolean;
+    symbolName: string;
+    types: ResolvedTypeIdentityResponse[] | null;
 }
 
 /** CompletionEntryLabelDetailsResponse holds additional label display text for a completion entry. */

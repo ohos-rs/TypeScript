@@ -66,13 +66,12 @@ describe("Encoder", () => {
         assert.deepStrictEqual(decoded.parseOptions, sf.parseOptions);
         const again = decode(encodeSourceFile(decoded));
         assert.deepStrictEqual(again.parseOptions, sf.parseOptions);
-        const statement = again.statements.at(0)!;
+        const statement = again.statements!.at(0)!;
         assert.strictEqual(statement.kind, SyntaxKind.ExpressionStatement);
-        if (statement.kind === SyntaxKind.ExpressionStatement) {
-            assert.strictEqual(statement.expression.virtual, true);
-            assert.strictEqual(statement.expression.kind, SyntaxKind.Identifier);
-            assert.strictEqual(statement.expression.getStart(again), 0);
-        }
+        const expression = statement.expression!;
+        assert.strictEqual(expression.virtual, true);
+        assert.strictEqual(expression.kind, SyntaxKind.Identifier);
+        assert.strictEqual(expression.getStart(), 0);
     });
     test("encodes empty source file", () => {
         const sf = makeSF("", "/test.ts", []);

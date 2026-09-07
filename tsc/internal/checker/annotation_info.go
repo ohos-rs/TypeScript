@@ -1,6 +1,19 @@
 package checker
 
-import "github.com/microsoft/TypeScript/tsc/internal/ast"
+import (
+	"path/filepath"
+	"strings"
+
+	"github.com/microsoft/TypeScript/tsc/internal/ast"
+)
+
+type AnnotationImportDisposition string
+
+const (
+	AnnotationImportUnchanged AnnotationImportDisposition = "unchanged"
+	AnnotationImportRename    AnnotationImportDisposition = "rename"
+	AnnotationImportRemove    AnnotationImportDisposition = "remove"
+)
 
 // AnnotationInfo exposes type/checker facts, never generated expressions.
 // The consumer owns OH ohApi.ts::transformAnnotation code generation.
@@ -101,4 +114,46 @@ func (c *Checker) GetAnnotationInfo(node *ast.Node) *AnnotationInfo {
 		info.Properties = append(info.Properties, property)
 	}
 	return info
+}
+
+// GetAnnotationImportDisposition exports the three decisions made by
+// OH checker.ts::isReferredToAnnotation,
+// isReferredToSourceRetentionAnnotationOrRetentionAnnotation and
+// isReferredToRetentionPolicy. The OXC consumer owns only the corresponding
+// import AST edit; alias resolution and SDK declaration identity stay here.
+func (c *Checker) GetAnnotationImportDisposition(node *ast.Node) AnnotationImportDisposition {
+	if !ast.IsImportSpecifier(node) || ast.IsTypeOnlyImportOrExportDeclaration(node) {
+		return AnnotationImportUnchanged
+	}
+	symbol := c.getSymbolOfDeclaration(node)
+	if symbol == nil {
+		return AnnotationImportUnchanged
+	}
+	target := c.resolveAlias(symbol)
+	if target == nil || target == c.unknownSymbol {
+		return AnnotationImportUnchanged
+	}
+	if target.Flags&ast.SymbolFlagsConstEnum != 0 {
+		for _, declaration := range target.Declarations {
+			if ast.IsEnumDeclaration(declaration) &&
+				declaration.Name().Text() == "RetentionPolicy" &&
+				strings.EqualFold(filepath.Base(ast.GetSourceFileOfNode(declaration).FileName()), "@arkts.lang.d.ets") {
+				return AnnotationImportRemove
+			}
+		}
+	}
+	if !isAnnotationSymbol(target) {
+		return AnnotationImportUnchanged
+	}
+	declaration := target.ValueDeclaration
+	if declaration == nil && len(target.Declarations) != 0 {
+		declaration = target.Declarations[0]
+	}
+	if declaration == nil || !ast.IsAnnotationDeclaration(declaration) {
+		return AnnotationImportUnchanged
+	}
+	if isRetentionAnnotationDeclaration(declaration) || c.isSourceRetentionAnnotationDeclaration(declaration) {
+		return AnnotationImportRemove
+	}
+	return AnnotationImportRename
 }

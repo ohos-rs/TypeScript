@@ -168,6 +168,8 @@ const (
 	MethodGetFalseTypeOfConditionalType     Method = "getFalseTypeOfConditionalType"
 	MethodGetConstantValue                  Method = "getConstantValue"
 	MethodGetAnnotationInfo                 Method = "getAnnotationInfo"
+	MethodGetAnnotationTransformInfos       Method = "getAnnotationTransformInfos"
+	MethodGetArkTSTransformTypeFacts        Method = "getArkTSTransformTypeFacts"
 	MethodGetSignatureFromDeclaration       Method = "getSignatureFromDeclaration"
 	MethodGetExportSpecifierLocalTarget     Method = "getExportSpecifierLocalTargetSymbol"
 	MethodGetAliasedSymbol                  Method = "getAliasedSymbol"
@@ -534,6 +536,8 @@ var unmarshalers = map[Method]func([]byte) (any, error){
 	MethodGetImportAdderEdits:               unmarshallerFor[GetImportAdderEditsParams],
 	MethodGetConstantValue:                  unmarshallerFor[CheckerNodeParams],
 	MethodGetAnnotationInfo:                 unmarshallerFor[CheckerNodeParams],
+	MethodGetAnnotationTransformInfos:       unmarshallerFor[SelectedFilesEmitParams],
+	MethodGetArkTSTransformTypeFacts:        unmarshallerFor[SelectedFilesEmitParams],
 	MethodGetSignatureFromDeclaration:       unmarshallerFor[CheckerNodeParams],
 	MethodGetExportSpecifierLocalTarget:     unmarshallerFor[CheckerNodeParams],
 	MethodGetAliasedSymbol:                  unmarshallerFor[CheckerSymbolParams],
