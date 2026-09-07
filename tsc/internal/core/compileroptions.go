@@ -326,7 +326,11 @@ func (options *CompilerOptions) GetAllowImportingTsExtensions() bool {
 }
 
 func (options *CompilerOptions) AllowImportingTsExtensionsFrom(fileName string) bool {
-	return options.GetAllowImportingTsExtensions() || tspath.IsDeclarationFileName(fileName)
+	// The OpenHarmony compiler version used by ets_checker has no TS5097 and
+	// ets_checker.ts::resolveModuleNames explicitly resolves .ts/.ets source
+	// specifiers. Preserve that ArkTS contract when running on the newer native
+	// compiler without requiring projects to opt into a newer TypeScript flag.
+	return options.UsesOHModuleResolution() || options.GetAllowImportingTsExtensions() || tspath.IsDeclarationFileName(fileName)
 }
 
 func (options *CompilerOptions) GetResolveJsonModule() bool {

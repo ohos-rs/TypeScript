@@ -83,6 +83,20 @@ func TestOHTsImportEts(t *testing.T) {
 	}
 }
 
+// ets_checker.ts::resolveModuleNames explicitly accepts .ts/.ets source
+// specifiers, and the source OpenHarmony compiler predates TS5097. The native
+// compiler must not introduce that newer diagnostic into ArkTS builds.
+func TestOHExplicitSourceExtensionsDoNotRequireTypeScriptOptIn(t *testing.T) {
+	checkOHImport(t, map[string]string{
+		"/entry.ets":  "export { value } from './target.ts'; import { etsValue } from './target.ets'; etsValue;",
+		"/target.ts":  "export const value = 1;",
+		"/target.ets": "export const etsValue = 2;",
+	}, []string{"/entry.ets"}, &core.CompilerOptions{
+		NoEmit: core.TSTrue, PackageManagerType: "ohpm", Target: core.ScriptTargetESNext,
+		Module: core.ModuleKindCommonJS, ModuleResolution: core.ModuleResolutionKindBundler,
+	}, 0)
+}
+
 func checkOHImport(t *testing.T, files map[string]string, roots []string, options *core.CompilerOptions, code int) {
 	t.Helper()
 	fs := bundled.WrapFS(vfstest.FromMap(files, true))
