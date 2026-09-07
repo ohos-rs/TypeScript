@@ -983,6 +983,10 @@ func (tx *DeclarationTransformer) transformPropertySignatureDeclaration(input *a
 }
 
 func (tx *DeclarationTransformer) transformPropertyDeclaration(input *ast.PropertyDeclaration) *ast.Node {
+	// OH declarations.ts preserves annotation defaults, unlike class fields.
+	if ast.IsAnnotationPropertyDeclaration(input.AsNode()) {
+		return tx.Factory().UpdatePropertyDeclaration(input, nil, input.Name(), nil, tx.ensureType(input.AsNode(), false), input.Initializer)
+	}
 	if ast.IsPrivateIdentifier(input.Name()) {
 		return nil
 	}
@@ -2307,7 +2311,10 @@ func (tx *DeclarationTransformer) transformEnumDeclaration(input *ast.EnumDeclar
 	)
 }
 
-func (tx *DeclarationTransformer) ensureModifiers(node *ast.Node) *ast.ModifierList {
+func (tx *DeclarationTransformer) ensureModifiers(node *ast.Node) (result *ast.ModifierList) {
+	// OH declarations.ts retains resolved annotations on declaration targets
+	// and marks the annotation/enum imports visible before the late-import pass.
+	defer func() { result = tx.preserveAnnotations(node, result) }()
 	currentFlags := ast.GetCombinedModifierFlags(tx.EmitContext().ParseNode(node)) & ast.ModifierFlagsAll
 	newFlags := tx.ensureModifierFlags(node)
 	if currentFlags == newFlags {
@@ -2320,11 +2327,41 @@ func (tx *DeclarationTransformer) ensureModifiers(node *ast.Node) *ast.ModifierL
 			return tx.Factory().NewModifierList(core.Filter(mods.Nodes, ast.IsModifier))
 		}
 	}
-	result := ast.CreateModifiersFromModifierFlags(newFlags, tx.Factory().NewModifier)
-	if len(result) == 0 {
+	modifiers := ast.CreateModifiersFromModifierFlags(newFlags, tx.Factory().NewModifier)
+	if len(modifiers) == 0 {
 		return nil
 	}
-	return tx.Factory().NewModifierList(result)
+	return tx.Factory().NewModifierList(modifiers)
+}
+
+func (tx *DeclarationTransformer) preserveAnnotations(node *ast.Node, modifiers *ast.ModifierList) *ast.ModifierList {
+	var annotations []*ast.Node
+	for _, modifier := range node.ModifierNodes() {
+		if !ast.IsDecorator(modifier) || !tx.resolver.IsEtsAnnotation(modifier) {
+			continue
+		}
+		annotations = append(annotations, modifier)
+		expr := modifier.Expression()
+		if ast.IsCallExpression(expr) {
+			tx.checkEntityNameVisibility(expr.Expression(), tx.enclosingDeclaration)
+			if len(expr.Arguments()) != 0 && ast.IsObjectLiteralExpression(expr.Arguments()[0]) {
+				for _, prop := range expr.Arguments()[0].AsObjectLiteralExpression().Properties.Nodes {
+					if ast.IsPropertyAssignment(prop) && ast.IsPropertyAccessExpression(prop.Initializer()) {
+						tx.checkEntityNameVisibility(prop.Initializer(), tx.enclosingDeclaration)
+					}
+				}
+			}
+		} else if ast.IsIdentifier(expr) {
+			tx.checkEntityNameVisibility(expr, tx.enclosingDeclaration)
+		}
+	}
+	if len(annotations) == 0 {
+		return modifiers
+	}
+	if modifiers != nil {
+		annotations = append(annotations, modifiers.Nodes...)
+	}
+	return tx.Factory().NewModifierList(annotations)
 }
 
 func (tx *DeclarationTransformer) ensureModifierFlags(node *ast.Node) ast.ModifierFlags {

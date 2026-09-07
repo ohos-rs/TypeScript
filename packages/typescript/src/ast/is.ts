@@ -591,3 +591,8 @@ export function isStructDeclaration(node: Node): node is ClassDeclaration {
 export function isEtsComponentExpression(node: Node): node is CallExpression {
     return node.kind === SyntaxKind.CallExpression && !!(node.flags & NodeFlags.EtsComponent);
 }
+
+/** ETS annotation identity; storage is class-like, semantics are not a class. */
+export function isAnnotationDeclaration(node: Node): node is ClassDeclaration {
+    return node.kind === SyntaxKind.ClassDeclaration && !!(node.flags & NodeFlags.Annotation);
+}

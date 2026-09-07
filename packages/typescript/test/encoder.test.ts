@@ -57,6 +57,23 @@ function decode(data: Uint8Array): RemoteSourceFile {
 }
 
 describe("Encoder", () => {
+    test("preserves ETS config and virtual metadata through client re-encoding", () => {
+        const id = Object.assign(createIdentifier("CommonInstance"), { virtual: true, pos: 0, end: 1 });
+        const sf = Object.assign(makeSF("  .width(1)", "/test.ets", [createExpressionStatement(id)]), {
+            parseOptions: { flags: 7, ets: { components: ["widget", "组件"], render: { decorator: [] } } },
+        });
+        const decoded = decode(encodeSourceFile(sf));
+        assert.deepStrictEqual(decoded.parseOptions, sf.parseOptions);
+        const again = decode(encodeSourceFile(decoded));
+        assert.deepStrictEqual(again.parseOptions, sf.parseOptions);
+        const statement = again.statements.at(0)!;
+        assert.strictEqual(statement.kind, SyntaxKind.ExpressionStatement);
+        if (statement.kind === SyntaxKind.ExpressionStatement) {
+            assert.strictEqual(statement.expression.virtual, true);
+            assert.strictEqual(statement.expression.kind, SyntaxKind.Identifier);
+            assert.strictEqual(statement.expression.getStart(again), 0);
+        }
+    });
     test("encodes empty source file", () => {
         const sf = makeSF("", "/test.ts", []);
 
@@ -67,7 +84,7 @@ describe("Encoder", () => {
         // Verify header
         const view = new DataView(encoded.buffer, encoded.byteOffset, encoded.byteLength);
         const metadata = view.getUint32(0, true);
-        assert.strictEqual(metadata >>> 24, 9, "protocol version should be 9");
+        assert.strictEqual(metadata >>> 24, 10, "protocol version should be 10");
 
         // Verify we can decode it
         const decoded = decode(encoded);
@@ -179,11 +196,11 @@ describe("Encoder", () => {
         assert.strictEqual(rootKind, SyntaxKind.IfStatement);
     });
 
-    test("protocol version is 9", () => {
+    test("protocol version is 10", () => {
         const sf = makeSF("", "/test.ts", []);
         const encoded = encodeSourceFile(sf);
         const view = new DataView(encoded.buffer, encoded.byteOffset, encoded.byteLength);
-        assert.strictEqual(view.getUint32(0, true) >>> 24, 9);
+        assert.strictEqual(view.getUint32(0, true) >>> 24, 10);
     });
 
     test("encodes source files without content mapping metadata", () => {

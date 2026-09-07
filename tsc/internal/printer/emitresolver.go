@@ -83,6 +83,7 @@ type EmitResolver interface {
 	GetEffectiveDeclarationFlags(node *ast.Node, flags ast.ModifierFlags) ast.ModifierFlags
 
 	// decorator metadata
+	IsEtsAnnotation(node *ast.Node) bool
 	GetTypeReferenceSerializationKind(name *ast.EntityName, serialScope *ast.Node) TypeReferenceSerializationKind
 
 	// const enum inlining

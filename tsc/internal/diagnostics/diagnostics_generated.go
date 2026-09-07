@@ -3776,6 +3776,98 @@ var Duplicate_named_capturing_groups_are_only_available_when_targeting_0_or_late
 
 var Private_identifiers_cannot_be_used_in_destructuring_patterns = &Message{code: 18064, category: CategoryError, key: "Private_identifiers_cannot_be_used_in_destructuring_patterns_18064", text: "Private identifiers cannot be used in destructuring patterns."}
 
+var Should_not_add_return_type_to_the_function_that_is_annotated_by_Extend = &Message{code: 28000, category: CategoryError, key: "Should_not_add_return_type_to_the_function_that_is_annotated_by_Extend_28000", text: "Should not add return type to the function that is annotated by Extend."}
+
+var A_struct_declaration_without_the_default_modifier_must_have_a_name = &Message{code: 28002, category: CategoryError, key: "A_struct_declaration_without_the_default_modifier_must_have_a_name_28002", text: "A struct declaration without the 'default' modifier must have a name."}
+
+var Should_not_add_return_type_to_the_function_that_is_annotated_by_Styles = &Message{code: 28003, category: CategoryError, key: "Should_not_add_return_type_to_the_function_that_is_annotated_by_Styles_28003", text: "Should not add return type to the function that is annotated by Styles."}
+
+var Unable_to_resolve_signature_of_function_decorator_when_decorators_are_not_valid = &Message{code: 28004, category: CategoryError, key: "Unable_to_resolve_signature_of_function_decorator_when_decorators_are_not_valid_28004", text: "Unable to resolve signature of function decorator when decorators are not valid."}
+
+var The_statement_must_be_written_use_the_function_0_under_the_if_condition = &Message{code: 28005, category: CategoryWarning, key: "The_statement_must_be_written_use_the_function_0_under_the_if_condition_28005", text: "The statement must be written use the function '{0}' under the if condition."}
+
+var The_struct_name_cannot_contain_reserved_tag_name_Colon_0 = &Message{code: 28006, category: CategoryError, key: "The_struct_name_cannot_contain_reserved_tag_name_Colon_0_28006", text: "The struct name cannot contain reserved tag name: '{0}'."}
+
+var This_API_has_been_Special_Markings_exercise_caution_when_using_this_API = &Message{code: 28007, category: CategoryWarning, key: "This_API_has_been_Special_Markings_exercise_caution_when_using_this_API_28007", text: "This API has been Special Markings. exercise caution when using this API."}
+
+var Looking_up_in_oh_modules_folder_initial_location_0 = &Message{code: 28008, category: CategoryMessage, key: "Looking_up_in_oh_modules_folder_initial_location_0_28008", text: "Looking up in 'oh_modules' folder, initial location '{0}'."}
+
+var Containing_file_is_not_specified_and_root_directory_cannot_be_determined_skipping_lookup_in_oh_modules_folder = &Message{code: 28009, category: CategoryMessage, key: "Containing_file_is_not_specified_and_root_directory_cannot_be_determined_skipping_lookup_in_oh_modul_28009", text: "Containing file is not specified and root directory cannot be determined, skipping lookup in 'oh_modules' folder."}
+
+var Loading_module_0_from_oh_modules_folder_target_file_type_1 = &Message{code: 28010, category: CategoryMessage, key: "Loading_module_0_from_oh_modules_folder_target_file_type_1_28010", text: "Loading module '{0}' from 'oh_modules' folder, target file type '{1}'."}
+
+var Found_oh_package_json5_at_0 = &Message{code: 28011, category: CategoryMessage, key: "Found_oh_package_json5_at_0_28011", text: "Found 'oh-package.json5' at '{0}'."}
+
+var X_oh_package_json5_does_not_have_a_0_field = &Message{code: 28012, category: CategoryMessage, key: "oh_package_json5_does_not_have_a_0_field_28012", text: "'oh-package.json5' does not have a '{0}' field."}
+
+var X_oh_package_json5_has_0_field_1_that_references_2 = &Message{code: 28013, category: CategoryMessage, key: "oh_package_json5_has_0_field_1_that_references_2_28013", text: "'oh-package.json5' has '{0}' field '{1}' that references '{2}'."}
+
+var Currently_module_for_0_is_not_verified_If_you_re_importing_napi_its_verification_will_be_enabled_in_later_SDK_version_Please_make_sure_the_corresponding_d_ts_file_is_provided_and_the_napis_are_correctly_declared = &Message{code: 28014, category: CategoryWarning, key: "Currently_module_for_0_is_not_verified_If_you_re_importing_napi_its_verification_will_be_enabled_in__28014", text: "Currently module for '{0}' is not verified. If you're importing napi, its verification will be enabled in later SDK version. Please make sure the corresponding .d.ts file is provided and the napis are correctly declared."}
+
+var UI_component_0_cannot_be_used_in_this_place = &Message{code: 28015, category: CategoryError, key: "UI_component_0_cannot_be_used_in_this_place_28015", text: "UI component '{0}' cannot be used in this place."}
+
+var Importing_ArkTS_files_in_JS_and_TS_files_is_about_to_be_forbidden = &Message{code: 28016, category: CategoryWarning, key: "Importing_ArkTS_files_in_JS_and_TS_files_is_about_to_be_forbidden_28016", text: "Importing ArkTS files in JS and TS files is about to be forbidden."}
+
+var Importing_ArkTS_files_in_JS_and_TS_files_is_forbidden = &Message{code: 28017, category: CategoryError, key: "Importing_ArkTS_files_in_JS_and_TS_files_is_forbidden_28017", text: "Importing ArkTS files in JS and TS files is forbidden."}
+
+var Unexpected_token_An_annotation_property_was_expected = &Message{code: 28018, category: CategoryError, key: "Unexpected_token_An_annotation_property_was_expected_28018", text: "Unexpected token. An annotation property was expected."}
+
+var When_annotation_0_is_applied_all_fields_without_default_values_must_be_provided = &Message{code: 28019, category: CategoryError, key: "When_annotation_0_is_applied_all_fields_without_default_values_must_be_provided_28019", text: "When annotation '{0}' is applied, all fields without default values must be provided."}
+
+var Only_an_object_literal_have_to_be_provided_as_annotation_parameters_list_got_Colon_0 = &Message{code: 28020, category: CategoryError, key: "Only_an_object_literal_have_to_be_provided_as_annotation_parameters_list_got_Colon_0_28020", text: "Only an object literal have to be provided as annotation parameters list, got: '{0}'."}
+
+var Annotation_have_to_be_applied_only_for_non_abstract_class_declarations_and_method_declarations_in_non_abstract_classes_got_Colon_0 = &Message{code: 28021, category: CategoryError, key: "Annotation_have_to_be_applied_only_for_non_abstract_class_declarations_and_method_declarations_in_no_28021", text: "Annotation have to be applied only for non-abstract class declarations and method declarations in non-abstract classes, got: '{0}'."}
+
+var Annotation_have_to_be_applied_for_classes_or_methods_in_classes_only_got_Colon_0 = &Message{code: 28022, category: CategoryError, key: "Annotation_have_to_be_applied_for_classes_or_methods_in_classes_only_got_Colon_0_28022", text: "Annotation have to be applied for classes or methods in classes only, got: '{0}'."}
+
+var Repeatable_annotation_are_not_supported_got_Colon_0 = &Message{code: 28023, category: CategoryError, key: "Repeatable_annotation_are_not_supported_got_Colon_0_28023", text: "Repeatable annotation are not supported, got: '{0}'."}
+
+var Annotation_must_be_defined_at_top_level_only = &Message{code: 28024, category: CategoryError, key: "Annotation_must_be_defined_at_top_level_only_28024", text: "Annotation must be defined at top-level only."}
+
+var Annotation_name_cannot_be_0 = &Message{code: 28025, category: CategoryError, key: "Annotation_name_cannot_be_0_28025", text: "Annotation name cannot be '{0}'."}
+
+var Annotation_cannot_be_applied_for_annotation_declaration = &Message{code: 28026, category: CategoryError, key: "Annotation_cannot_be_applied_for_annotation_declaration_28026", text: "Annotation cannot be applied for annotation declaration."}
+
+var Annotation_cannot_be_used_as_type_or_variable_or_function_or_method = &Message{code: 28027, category: CategoryError, key: "Annotation_cannot_be_used_as_type_or_variable_or_function_or_method_28027", text: "Annotation cannot be used as type or variable or function or method."}
+
+var Annotation_cannot_be_used_as_a_type = &Message{code: 28028, category: CategoryError, key: "Annotation_cannot_be_used_as_a_type_28028", text: "Annotation cannot be used as a type."}
+
+var Annotation_cannot_be_used_as_a_value = &Message{code: 28029, category: CategoryError, key: "Annotation_cannot_be_used_as_a_value_28029", text: "Annotation cannot be used as a value."}
+
+var Annotation_cannot_be_renamed_in_import_or_export = &Message{code: 28030, category: CategoryError, key: "Annotation_cannot_be_renamed_in_import_or_export_28030", text: "Annotation cannot be renamed in import or export."}
+
+var Annotation_cannot_be_exported_as_default = &Message{code: 28031, category: CategoryError, key: "Annotation_cannot_be_exported_as_default_28031", text: "Annotation cannot be exported as default."}
+
+var An_annotation_property_must_have_a_type_or_Slashand_an_initializer = &Message{code: 28032, category: CategoryError, key: "An_annotation_property_must_have_a_type_or_Slashand_an_initializer_28032", text: "An annotation property must have a type or/and an initializer."}
+
+var A_type_of_annotation_property_have_to_be_number_boolean_string_const_enumeration_types_or_array_of_above_types_got_Colon_0 = &Message{code: 28033, category: CategoryError, key: "A_type_of_annotation_property_have_to_be_number_boolean_string_const_enumeration_types_or_array_of_a_28033", text: "A type of annotation property have to be number, boolean, string, const enumeration types or array of above types, got: '{0}'."}
+
+var Default_value_of_annotation_property_can_be_a_constant_expression_got_Colon_0 = &Message{code: 28034, category: CategoryError, key: "Default_value_of_annotation_property_can_be_a_constant_expression_got_Colon_0_28034", text: "Default value of annotation property can be a constant expression, got: '{0}'."}
+
+var All_members_of_object_literal_which_is_provided_as_annotation_parameters_list_have_to_be_constant_expressions_got_Colon_0 = &Message{code: 28035, category: CategoryError, key: "All_members_of_object_literal_which_is_provided_as_annotation_parameters_list_have_to_be_constant_ex_28035", text: "All members of object literal which is provided as annotation parameters list, have to be constant expressions, got: '{0}'."}
+
+var Annotation_0_used_before_its_declaration = &Message{code: 28036, category: CategoryError, key: "Annotation_0_used_before_its_declaration_28036", text: "Annotation '{0}' used before its declaration."}
+
+var In_annotation_declaration_any_symbols_between_and_interface_are_forbidden = &Message{code: 28037, category: CategoryError, key: "In_annotation_declaration_any_symbols_between_and_interface_are_forbidden_28037", text: "In annotation declaration any symbols between '@' and 'interface' are forbidden."}
+
+var Enable_support_of_ETS_annotations = &Message{code: 28038, category: CategoryMessage, key: "Enable_support_of_ETS_annotations_28038", text: "Enable support of ETS annotations"}
+
+var Annotation_can_only_be_exported_in_declaration_statement = &Message{code: 28039, category: CategoryError, key: "Annotation_can_only_be_exported_in_declaration_statement_28039", text: "Annotation can only be exported in declaration statement."}
+
+var Function_may_throw_exceptions_Special_handling_is_required = &Message{code: 28040, category: CategoryWarning, key: "Function_may_throw_exceptions_Special_handling_is_required_28040", text: "Function may throw exceptions. Special handling is required."}
+
+var Annotations_are_not_supported_in_Hars_compiled_to_JavaScript_files = &Message{code: 28041, category: CategoryError, key: "Annotations_are_not_supported_in_Hars_compiled_to_JavaScript_files_28041", text: "Annotations are not supported in Hars compiled to JavaScript files."}
+
+var Annotation_cannot_be_applied_for_getter_or_setter_got_Colon_0 = &Message{code: 28042, category: CategoryError, key: "Annotation_cannot_be_applied_for_getter_or_setter_got_Colon_0_28042", text: "Annotation cannot be applied for getter or setter, got: '{0}'."}
+
+var X_0_annotation_are_not_valid_here_got_Colon_1 = &Message{code: 28043, category: CategoryError, key: "_0_annotation_are_not_valid_here_got_Colon_1_28043", text: "{0} annotation are not valid here, got: '{1}'."}
+
+var Annotation_cannot_be_applied_for_constructor_got_Colon_0 = &Message{code: 28044, category: CategoryError, key: "Annotation_cannot_be_applied_for_constructor_got_Colon_0_28044", text: "Annotation cannot be applied for constructor, got: '{0}'."}
+
+var Cannot_find_module_0_This_module_is_not_exported = &Message{code: 28045, category: CategoryError, key: "Cannot_find_module_0_This_module_is_not_exported_28045", text: "Cannot find module '{0}'. This module is not exported."}
+
+var X_0_should_only_be_applied_to_annotation_declarations = &Message{code: 28046, category: CategoryError, key: "_0_should_only_be_applied_to_annotation_declarations_28046", text: "{0} should only be applied to annotation declarations."}
+
 var X_nodenext_if_module_is_nodenext_node16_if_module_is_node16_or_node18_otherwise_bundler = &Message{code: 69010, category: CategoryMessage, key: "nodenext_if_module_is_nodenext_node16_if_module_is_node16_or_node18_otherwise_bundler_69010", text: "`nodenext` if `module` is `nodenext`; `node16` if `module` is `node16` or `node18`; otherwise, `bundler`."}
 
 var File_is_a_CommonJS_module_it_may_be_converted_to_an_ES_module = &Message{code: 80001, category: CategorySuggestion, key: "File_is_a_CommonJS_module_it_may_be_converted_to_an_ES_module_80001", text: "File is a CommonJS module; it may be converted to an ES module."}
@@ -8202,6 +8294,98 @@ func keyToMessage(key Key) *Message {
 		return Duplicate_named_capturing_groups_are_only_available_when_targeting_0_or_later
 	case "Private_identifiers_cannot_be_used_in_destructuring_patterns_18064":
 		return Private_identifiers_cannot_be_used_in_destructuring_patterns
+	case "Should_not_add_return_type_to_the_function_that_is_annotated_by_Extend_28000":
+		return Should_not_add_return_type_to_the_function_that_is_annotated_by_Extend
+	case "A_struct_declaration_without_the_default_modifier_must_have_a_name_28002":
+		return A_struct_declaration_without_the_default_modifier_must_have_a_name
+	case "Should_not_add_return_type_to_the_function_that_is_annotated_by_Styles_28003":
+		return Should_not_add_return_type_to_the_function_that_is_annotated_by_Styles
+	case "Unable_to_resolve_signature_of_function_decorator_when_decorators_are_not_valid_28004":
+		return Unable_to_resolve_signature_of_function_decorator_when_decorators_are_not_valid
+	case "The_statement_must_be_written_use_the_function_0_under_the_if_condition_28005":
+		return The_statement_must_be_written_use_the_function_0_under_the_if_condition
+	case "The_struct_name_cannot_contain_reserved_tag_name_Colon_0_28006":
+		return The_struct_name_cannot_contain_reserved_tag_name_Colon_0
+	case "This_API_has_been_Special_Markings_exercise_caution_when_using_this_API_28007":
+		return This_API_has_been_Special_Markings_exercise_caution_when_using_this_API
+	case "Looking_up_in_oh_modules_folder_initial_location_0_28008":
+		return Looking_up_in_oh_modules_folder_initial_location_0
+	case "Containing_file_is_not_specified_and_root_directory_cannot_be_determined_skipping_lookup_in_oh_modul_28009":
+		return Containing_file_is_not_specified_and_root_directory_cannot_be_determined_skipping_lookup_in_oh_modules_folder
+	case "Loading_module_0_from_oh_modules_folder_target_file_type_1_28010":
+		return Loading_module_0_from_oh_modules_folder_target_file_type_1
+	case "Found_oh_package_json5_at_0_28011":
+		return Found_oh_package_json5_at_0
+	case "oh_package_json5_does_not_have_a_0_field_28012":
+		return X_oh_package_json5_does_not_have_a_0_field
+	case "oh_package_json5_has_0_field_1_that_references_2_28013":
+		return X_oh_package_json5_has_0_field_1_that_references_2
+	case "Currently_module_for_0_is_not_verified_If_you_re_importing_napi_its_verification_will_be_enabled_in__28014":
+		return Currently_module_for_0_is_not_verified_If_you_re_importing_napi_its_verification_will_be_enabled_in_later_SDK_version_Please_make_sure_the_corresponding_d_ts_file_is_provided_and_the_napis_are_correctly_declared
+	case "UI_component_0_cannot_be_used_in_this_place_28015":
+		return UI_component_0_cannot_be_used_in_this_place
+	case "Importing_ArkTS_files_in_JS_and_TS_files_is_about_to_be_forbidden_28016":
+		return Importing_ArkTS_files_in_JS_and_TS_files_is_about_to_be_forbidden
+	case "Importing_ArkTS_files_in_JS_and_TS_files_is_forbidden_28017":
+		return Importing_ArkTS_files_in_JS_and_TS_files_is_forbidden
+	case "Unexpected_token_An_annotation_property_was_expected_28018":
+		return Unexpected_token_An_annotation_property_was_expected
+	case "When_annotation_0_is_applied_all_fields_without_default_values_must_be_provided_28019":
+		return When_annotation_0_is_applied_all_fields_without_default_values_must_be_provided
+	case "Only_an_object_literal_have_to_be_provided_as_annotation_parameters_list_got_Colon_0_28020":
+		return Only_an_object_literal_have_to_be_provided_as_annotation_parameters_list_got_Colon_0
+	case "Annotation_have_to_be_applied_only_for_non_abstract_class_declarations_and_method_declarations_in_no_28021":
+		return Annotation_have_to_be_applied_only_for_non_abstract_class_declarations_and_method_declarations_in_non_abstract_classes_got_Colon_0
+	case "Annotation_have_to_be_applied_for_classes_or_methods_in_classes_only_got_Colon_0_28022":
+		return Annotation_have_to_be_applied_for_classes_or_methods_in_classes_only_got_Colon_0
+	case "Repeatable_annotation_are_not_supported_got_Colon_0_28023":
+		return Repeatable_annotation_are_not_supported_got_Colon_0
+	case "Annotation_must_be_defined_at_top_level_only_28024":
+		return Annotation_must_be_defined_at_top_level_only
+	case "Annotation_name_cannot_be_0_28025":
+		return Annotation_name_cannot_be_0
+	case "Annotation_cannot_be_applied_for_annotation_declaration_28026":
+		return Annotation_cannot_be_applied_for_annotation_declaration
+	case "Annotation_cannot_be_used_as_type_or_variable_or_function_or_method_28027":
+		return Annotation_cannot_be_used_as_type_or_variable_or_function_or_method
+	case "Annotation_cannot_be_used_as_a_type_28028":
+		return Annotation_cannot_be_used_as_a_type
+	case "Annotation_cannot_be_used_as_a_value_28029":
+		return Annotation_cannot_be_used_as_a_value
+	case "Annotation_cannot_be_renamed_in_import_or_export_28030":
+		return Annotation_cannot_be_renamed_in_import_or_export
+	case "Annotation_cannot_be_exported_as_default_28031":
+		return Annotation_cannot_be_exported_as_default
+	case "An_annotation_property_must_have_a_type_or_Slashand_an_initializer_28032":
+		return An_annotation_property_must_have_a_type_or_Slashand_an_initializer
+	case "A_type_of_annotation_property_have_to_be_number_boolean_string_const_enumeration_types_or_array_of_a_28033":
+		return A_type_of_annotation_property_have_to_be_number_boolean_string_const_enumeration_types_or_array_of_above_types_got_Colon_0
+	case "Default_value_of_annotation_property_can_be_a_constant_expression_got_Colon_0_28034":
+		return Default_value_of_annotation_property_can_be_a_constant_expression_got_Colon_0
+	case "All_members_of_object_literal_which_is_provided_as_annotation_parameters_list_have_to_be_constant_ex_28035":
+		return All_members_of_object_literal_which_is_provided_as_annotation_parameters_list_have_to_be_constant_expressions_got_Colon_0
+	case "Annotation_0_used_before_its_declaration_28036":
+		return Annotation_0_used_before_its_declaration
+	case "In_annotation_declaration_any_symbols_between_and_interface_are_forbidden_28037":
+		return In_annotation_declaration_any_symbols_between_and_interface_are_forbidden
+	case "Enable_support_of_ETS_annotations_28038":
+		return Enable_support_of_ETS_annotations
+	case "Annotation_can_only_be_exported_in_declaration_statement_28039":
+		return Annotation_can_only_be_exported_in_declaration_statement
+	case "Function_may_throw_exceptions_Special_handling_is_required_28040":
+		return Function_may_throw_exceptions_Special_handling_is_required
+	case "Annotations_are_not_supported_in_Hars_compiled_to_JavaScript_files_28041":
+		return Annotations_are_not_supported_in_Hars_compiled_to_JavaScript_files
+	case "Annotation_cannot_be_applied_for_getter_or_setter_got_Colon_0_28042":
+		return Annotation_cannot_be_applied_for_getter_or_setter_got_Colon_0
+	case "_0_annotation_are_not_valid_here_got_Colon_1_28043":
+		return X_0_annotation_are_not_valid_here_got_Colon_1
+	case "Annotation_cannot_be_applied_for_constructor_got_Colon_0_28044":
+		return Annotation_cannot_be_applied_for_constructor_got_Colon_0
+	case "Cannot_find_module_0_This_module_is_not_exported_28045":
+		return Cannot_find_module_0_This_module_is_not_exported
+	case "_0_should_only_be_applied_to_annotation_declarations_28046":
+		return X_0_should_only_be_applied_to_annotation_declarations
 	case "nodenext_if_module_is_nodenext_node16_if_module_is_node16_or_node18_otherwise_bundler_69010":
 		return X_nodenext_if_module_is_nodenext_node16_if_module_is_node16_or_node18_otherwise_bundler
 	case "File_is_a_CommonJS_module_it_may_be_converted_to_an_ES_module_80001":

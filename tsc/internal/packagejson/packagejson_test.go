@@ -2,6 +2,7 @@ package packagejson_test
 
 import (
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -19,6 +20,30 @@ import (
 var packageJsonFixtures = []filefixture.Fixture{
 	filefixture.FromFile("package.json", filepath.Join(repo.RootPath(), "package.json")),
 	filefixture.FromFile("date-fns.json", filepath.Join(repo.TestDataPath(), "fixtures", "packagejson", "date-fns.json")),
+}
+
+func TestParseJSON5PreservesConditionalExportOrder(t *testing.T) {
+	t.Parallel()
+
+	fields, err := packagejson.ParseJSON5([]byte(`{
+		// The OH resolver uses the json5 package for this manifest.
+		name: 'pkg',
+		version: '1.0.0',
+		types: 'index.d.ets',
+		exports: {
+			'.': {
+				'types': './types.d.ets',
+				'default': './index.js',
+			},
+		},
+	}`))
+	assert.NilError(t, err)
+	name, ok := fields.Name.GetValue()
+	assert.Assert(t, ok)
+	assert.Equal(t, name, "pkg")
+	root, ok := fields.Exports.AsObject().Get(".")
+	assert.Assert(t, ok)
+	assert.DeepEqual(t, slices.Collect(root.AsObject().Keys()), []string{"types", "default"})
 }
 
 func BenchmarkPackageJSON(b *testing.B) {

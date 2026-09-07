@@ -59,7 +59,7 @@ func TestContentMappedParseCacheKeyReconstruction(t *testing.T) {
 		ParseOptions:  acquireOptions,
 	})
 	expected := ContentMappedParseCacheKey{SourceFileParseOptions: acquireOptions, Hash: hash}
-	assert.DeepEqual(t, contentMappedParseCacheKeyForFile(file), expected)
+	assert.Equal(t, contentMappedParseCacheKeyForFile(file), expected)
 
 	duplicate := &compiler.DuplicateSourceFile{
 		ParseOptions:              mappedOptions,
@@ -67,7 +67,7 @@ func TestContentMappedParseCacheKeyReconstruction(t *testing.T) {
 		Hash:                      hash,
 		ContentMapper:             "mapper",
 	}
-	assert.DeepEqual(t, contentMappedParseCacheKeyForDuplicate(duplicate), expected)
+	assert.Equal(t, contentMappedParseCacheKeyForDuplicate(duplicate), expected)
 }
 
 func TestParseCacheBindsBeforePublishing(t *testing.T) {

@@ -1364,6 +1364,14 @@ func (p *Printer) emitModifierList(parentNode *ast.Node, modifiers *ast.Modifier
 	if modifiers == nil || len(modifiers.Nodes) == 0 {
 		return parentNode.Pos()
 	}
+	// OH emitter prints illegalDecorators on these declaration kinds. ETS
+	// stores them in the unified modifier list, including source annotations.
+	if !allowDecorators && p.currentSourceFile != nil && p.currentSourceFile.ScriptKind == core.ScriptKindETS {
+		switch parentNode.Kind {
+		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindPropertySignature, ast.KindMethodSignature, ast.KindVariableStatement, ast.KindEnumDeclaration, ast.KindModuleDeclaration:
+			allowDecorators = true
+		}
+	}
 
 	if core.Every(modifiers.Nodes, ast.IsModifier) {
 		// if all modifier-likes are `Modifier`, simply emit the list as modifiers.
@@ -2689,10 +2697,6 @@ func (p *Printer) emitConciseBody(node *ast.BlockOrExpression) {
 }
 
 func (p *Printer) emitArrowFunction(node *ast.ArrowFunction) {
-	if node.Flags&ast.NodeFlagsEtsStylesBlock != 0 {
-		p.emitBlock(node.Body.AsBlock())
-		return
-	}
 	state := p.enterNode(node.AsNode())
 	p.emitModifierList(node.AsNode(), node.Modifiers(), false /*allowDecorators*/)
 	indented := p.shouldEmitIndented(node.AsNode())
@@ -3243,9 +3247,7 @@ func (p *Printer) emitExpression(node *ast.Expression, precedence ast.OperatorPr
 	case ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
 		p.emitTokenNode(node)
 	case ast.KindThisKeyword, ast.KindSuperKeyword, ast.KindImportKeyword:
-		if node.Flags&ast.NodeFlagsEtsImplicitReceiver == 0 {
-			p.emitKeywordExpression(node.AsKeywordExpression())
-		}
+		p.emitKeywordExpression(node.AsKeywordExpression())
 
 	// Literals
 	case ast.KindNumericLiteral:
@@ -3772,7 +3774,10 @@ func (p *Printer) emitClassDeclaration(node *ast.ClassDeclaration) {
 	state := p.enterNode(node.AsNode())
 	p.generateNameIfNeeded(node.Name())
 	pos := p.emitModifierList(node.AsNode(), node.Modifiers(), true /*allowDecorators*/)
-	if ast.IsStructDeclaration(node.AsNode()) {
+	if ast.IsAnnotationDeclaration(node.AsNode()) {
+		p.writePunctuation("@")
+		p.writeKeyword("interface")
+	} else if ast.IsStructDeclaration(node.AsNode()) {
 		p.writeKeyword("struct")
 	} else {
 		p.emitToken(ast.KindClassKeyword, pos, WriteKindKeyword, node.AsNode())

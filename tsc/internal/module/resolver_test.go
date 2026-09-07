@@ -329,6 +329,149 @@ func TestParseNodeModuleFromPath(t *testing.T) {
 	}
 }
 
+// OpenHarmony moduleNameResolver.ts selects both the package directory and
+// manifest name from compilerOptions.packageManagerType. An OHPM build must
+// never silently fall back to the npm package graph.
+func TestResolveModuleNameFromOhModules(t *testing.T) {
+	t.Parallel()
+
+	fs := vfstest.FromMap(map[string]string{
+		"/repo/oh_modules/pkg/oh-package.json5": `{
+			// OHPM manifests are JSON5, not strict JSON.
+			name: "pkg",
+			version: "1.2.3",
+			types: "types/index.d.ets",
+		}`,
+		"/repo/oh_modules/pkg/types/index.d.ets": "export declare const value: number;",
+		"/repo/node_modules/pkg/package.json":    `{"name":"pkg","version":"9.9.9","types":"index.d.ts"}`,
+		"/repo/node_modules/pkg/index.d.ts":      "export declare const wrong: string;",
+		"/repo/src/file.ets":                     "",
+	}, true)
+	host := &resolutionHostStub{fs: fs, cwd: "/repo"}
+	opts := &core.CompilerOptions{
+		ModuleResolution:   core.ModuleResolutionKindBundler,
+		Module:             core.ModuleKindESNext,
+		Target:             core.ScriptTargetESNext,
+		PackageManagerType: "ohpm",
+	}
+	resolver := module.NewResolver(host, opts, "", "", nil)
+
+	resolved, _ := resolver.ResolveModuleName("pkg", "/repo/src/file.ets", core.ModuleKindESNext, nil)
+	if !resolved.IsResolved() {
+		t.Fatal("OHPM package failed to resolve")
+	}
+	if got, want := resolved.ResolvedFileName, "/repo/oh_modules/pkg/types/index.d.ets"; got != want {
+		t.Fatalf("resolved file = %q, want %q", got, want)
+	}
+	if !resolved.IsExternalLibraryImport {
+		t.Fatal("OHPM dependency was not classified as an external library import")
+	}
+	if got, want := resolved.PackageId.String(), "pkg/types/index.d.ets@1.2.3"; got != want {
+		t.Fatalf("package id = %q, want %q", got, want)
+	}
+}
+
+func TestParseOhModuleFromPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		path string
+		want string
+	}{
+		{"/a/oh_modules/b/lib/index.d.ets", "/a/oh_modules/b"},
+		{"/a/oh_modules/@scope/b/lib/index.d.ets", "/a/oh_modules/@scope/b"},
+		{"/a/node_modules/b/index.d.ts", ""},
+	}
+	for _, tt := range tests {
+		if got := module.ParseNodeModuleFromPath(tt.path, false, "ohpm"); got != tt.want {
+			t.Errorf("ParseNodeModuleFromPath(%q, false, ohpm) = %q, want %q", tt.path, got, tt.want)
+		}
+	}
+}
+
+func TestOHResolverHostBehavior(t *testing.T) {
+	t.Parallel()
+
+	files := map[string]string{
+		"/repo/src/entry.ets":                   "",
+		"/repo/src/local.js":                    "exports.value = 1;",
+		"/repo/src/local.d.ets":                 "export declare const value: number;",
+		"/repo/external/hidden.d.ets":           "export declare const hidden: number;",
+		"/sdk/old/@ohos.display.d.ts":           "export declare const old: number;",
+		"/sdk/current/@ohos.display.d.ets":      "export declare const current: number;",
+		"/sdk/api/plain.d.ts":                   "export declare const api: number;",
+		"/loader/node_modules/tool.js":          "module.exports = {};",
+		"/repo/src/missing-relative.d.ets":      "export declare const relative: number;",
+		"/repo/feature/index.d.ets":             "export declare const feature: number;",
+		"/repo/oh_modules/pkg/oh-package.json5": `{name:'pkg',version:'1.0.0',types:'private.d.ets'}`,
+		"/repo/oh_modules/pkg/private.d.ets":    "export declare const privateValue: number;",
+	}
+	fs := vfstest.FromMap(files, true)
+	host := &resolutionHostStub{fs: fs, cwd: "/repo"}
+	baseOptions := core.CompilerOptions{
+		ModuleResolution:     core.ModuleResolutionKindBundler,
+		Module:               core.ModuleKindESNext,
+		Target:               core.ScriptTargetESNext,
+		EtsAnnotationsEnable: core.TSTrue,
+		PackageManagerType:   "ohpm",
+		OhSdkConfigs: []core.OhSdkConfig{{
+			ApiPaths: []string{"/sdk/old", "/sdk/current"},
+		}},
+		OhSystemModules:       []string{"@ohos.display.d.ets"},
+		OhFallbackModuleRoots: []string{"/sdk/api"},
+		OhLoaderModuleRoot:    "/loader/node_modules",
+		OhProjectPath:         "/repo/src/main/ets",
+		OhExternalApiPaths:    []string{"/repo/external"},
+		OhPackageExports: map[string][]string{
+			"pkg": {"/repo/oh_modules/pkg/public.d.ets"},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		specifier  string
+		want       string
+		unresolved bool
+		notExport  bool
+	}{
+		{name: "js sibling declaration", specifier: "./local.js", want: "/repo/src/local.d.ets"},
+		{name: "sdk uses last matching api path", specifier: "@ohos.display", want: "/sdk/current/@ohos.display.d.ets"},
+		{name: "fallback api", specifier: "plain", want: "/sdk/api/plain.d.ts"},
+		{name: "loader javascript", specifier: "tool", want: "/loader/node_modules/tool.js"},
+		{name: "relative declaration", specifier: "missing-relative", want: "/repo/src/missing-relative.d.ets"},
+		{name: "module root declaration", specifier: "feature", want: "/repo/feature/index.d.ets"},
+		{name: "oh exports", specifier: "pkg", want: "/repo/oh_modules/pkg/private.d.ets", notExport: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			options := baseOptions
+			resolver := module.NewResolver(host, &options, "", "", nil)
+			resolved, _ := resolver.ResolveModuleName(tt.specifier, "/repo/src/entry.ets", core.ModuleKindESNext, nil)
+			if tt.unresolved {
+				if resolved.IsResolved() {
+					t.Fatalf("%q resolved to %q", tt.specifier, resolved.ResolvedFileName)
+				}
+				return
+			}
+			if got := resolved.ResolvedFileName; got != tt.want {
+				t.Fatalf("%q resolved to %q, want %q", tt.specifier, got, tt.want)
+			}
+			if resolved.IsNotOhExport != tt.notExport {
+				t.Fatalf("%q IsNotOhExport = %v, want %v", tt.specifier, resolved.IsNotOhExport, tt.notExport)
+			}
+		})
+	}
+
+	t.Run("external api path is hidden", func(t *testing.T) {
+		options := baseOptions
+		resolver := module.NewResolver(host, &options, "", "", nil)
+		resolved, _ := resolver.ResolveModuleName("../external/hidden.d.ets", "/repo/src/entry.ets", core.ModuleKindESNext, nil)
+		if resolved.IsResolved() {
+			t.Fatalf("external API path resolved to %q", resolved.ResolvedFileName)
+		}
+	})
+}
+
 // Regression test for https://github.com/microsoft/TypeScript/tsc/issues/4478.
 //
 // While resolving a package with peerDependencies, two goroutines look up the

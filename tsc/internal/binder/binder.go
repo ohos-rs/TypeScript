@@ -752,6 +752,9 @@ func (b *Binder) bind(node *ast.Node) bool {
 func (b *Binder) bindPropertyWorker(node *ast.Node) {
 	isAutoAccessor := ast.IsAutoAccessorPropertyDeclaration(node)
 	includes := core.IfElse(isAutoAccessor, ast.SymbolFlagsAccessor, ast.SymbolFlagsProperty)
+	if ast.IsAnnotationPropertyDeclaration(node) && node.Initializer() != nil {
+		includes |= ast.SymbolFlagsOptional
+	}
 	excludes := core.IfElse(isAutoAccessor, ast.SymbolFlagsAccessorExcludes, ast.SymbolFlagsPropertyExcludes)
 	b.bindPropertyOrMethodOrAccessor(node, includes|getOptionalSymbolFlagForNode(node), excludes)
 }
@@ -949,7 +952,11 @@ func (b *Binder) bindClassLikeDeclaration(node *ast.Node) {
 	name := node.Name()
 	switch node.Kind {
 	case ast.KindClassDeclaration:
-		b.bindBlockScopedDeclaration(node, ast.SymbolFlagsClass, ast.SymbolFlagsClassExcludes)
+		flags := ast.SymbolFlagsClass
+		if ast.IsAnnotationDeclaration(node) {
+			flags |= ast.SymbolFlagsAnnotation
+		}
+		b.bindBlockScopedDeclaration(node, flags, ast.SymbolFlagsClassExcludes)
 	case ast.KindClassExpression:
 		nameText := ast.InternalSymbolNameClass
 		if name != nil {

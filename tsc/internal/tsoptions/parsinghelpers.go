@@ -272,6 +272,17 @@ func ParseCompilerOptions(key string, value any, allOptions *core.CompilerOption
 	if allOptions == nil {
 		return nil
 	}
+	if key == "ets" {
+		var ets core.EtsOptions
+		data, err := json.Marshal(value)
+		if err == nil {
+			err = json.Unmarshal(data, &ets)
+		}
+		if err != nil {
+			return []*ast.Diagnostic{ast.NewCompilerDiagnostic(diagnostics.Compiler_option_0_requires_a_value_of_type_1, "ets", "object")}
+		}
+		value = ets
+	}
 	parseCompilerOptions(key, value, allOptions)
 	return nil
 }
@@ -282,6 +293,8 @@ func parseCompilerOptions(key string, value any, allOptions *core.CompilerOption
 		key = option.Name
 	}
 	switch key {
+	case "ets":
+		allOptions.Ets = value.(core.EtsOptions)
 	case "allowJs":
 		allOptions.AllowJs = ParseTristate(value)
 	case "allowImportingTsExtensions":
@@ -350,6 +363,108 @@ func parseCompilerOptions(key string, value any, allOptions *core.CompilerOption
 		allOptions.ExplainFiles = ParseTristate(value)
 	case "experimentalDecorators":
 		allOptions.ExperimentalDecorators = ParseTristate(value)
+	case "isCompileJsHar":
+		allOptions.IsCompileJsHar = ParseTristate(value)
+	case "moduleRootPath":
+		allOptions.ModuleRootPath = ParseString(value)
+	case "maxFlowDepth":
+		allOptions.MaxFlowDepth, _ = value.(float64)
+	case "compileSdkVersion":
+		if version, ok := value.(float64); ok {
+			allOptions.CompileSdkVersion = &version
+		}
+	case "etsLoaderPath":
+		allOptions.EtsLoaderPath = ParseString(value)
+	case "tsImportSoCheck":
+		allOptions.TsImportSoCheck = ParseTristate(value)
+	case "needDoArkTsLinter":
+		allOptions.NeedDoArkTsLinter = ParseTristate(value)
+	case "isCompatibleVersion":
+		allOptions.IsCompatibleVersion = ParseTristate(value)
+	case "tsImportSendableEnable":
+		allOptions.TsImportSendableEnable = ParseTristate(value)
+	case "etsAnnotationsEnable":
+		allOptions.EtsAnnotationsEnable = ParseTristate(value)
+	case "packageManagerType":
+		allOptions.PackageManagerType = ParseString(value)
+	case "emitNodeModulesFiles":
+		allOptions.EmitNodeModulesFiles = ParseTristate(value)
+	case "skipTscOhModuleCheck":
+		allOptions.SkipTscOhModuleCheck = ParseTristate(value)
+	case "skipArkTSStaticBlocksCheck":
+		allOptions.SkipArkTSStaticBlocksCheck = ParseTristate(value)
+	case "skipPathsInKeyForCompilationSettings":
+		allOptions.SkipPathsInKeyForCompilationSettings = ParseTristate(value)
+	case "skipBaseUrlInKeyForCompilationSettings":
+		allOptions.SkipBaseUrlInKeyForCompilationSettings = ParseTristate(value)
+	case "compatibleSdkVersion":
+		if version, ok := value.(float64); ok {
+			allOptions.CompatibleSdkVersion = &version
+		}
+	case "compatibleSdkVersionStage":
+		allOptions.CompatibleSdkVersionStage = ParseString(value)
+	case "skipOhModulesLint":
+		allOptions.SkipOhModulesLint = ParseTristate(value)
+	case "enableStrictCheckOHModule":
+		allOptions.EnableStrictCheckOHModule = ParseTristate(value)
+	case "disableStrictCheckPaths":
+		allOptions.DisableStrictCheckPaths = ParseStringArray(value)
+	case "disableSendableCheckRules":
+		allOptions.DisableSendableCheckRules = ParseStringArray(value)
+	case "mixCompile":
+		allOptions.MixCompile = ParseTristate(value)
+	case "strictCheckerOnly":
+		allOptions.StrictCheckerOnly = ParseTristate(value)
+	case "ohSdkConfigs":
+		allOptions.OhSdkConfigs, _ = value.([]core.OhSdkConfig)
+	case "ohSystemModules":
+		allOptions.OhSystemModules = ParseStringArray(value)
+	case "ohSdkConfigPrefixes":
+		allOptions.OhSdkConfigPrefixes = ParseStringArray(value)
+	case "ohFallbackModuleRoots":
+		allOptions.OhFallbackModuleRoots = ParseStringArray(value)
+	case "ohLoaderModuleRoot":
+		allOptions.OhLoaderModuleRoot = ParseString(value)
+	case "ohProjectPath":
+		allOptions.OhProjectPath = ParseString(value)
+	case "ohExternalApiPaths":
+		allOptions.OhExternalApiPaths = ParseStringArray(value)
+	case "ohPackageExports":
+		allOptions.OhPackageExports, _ = value.(map[string][]string)
+	case "ohRuntimeOS":
+		allOptions.OhRuntimeOS = ParseString(value)
+	case "ohOriginCompatibleSdkVersion":
+		allOptions.OhOriginCompatibleSdkVersion = ParseString(value)
+	case "ohProjectRootPath":
+		allOptions.OhProjectRootPath = ParseString(value)
+	case "ohModulePath":
+		allOptions.OhModulePath = ParseString(value)
+	case "ohAllModulePaths":
+		allOptions.OhAllModulePaths = ParseStringArray(value)
+	case "ohGlobalModulePaths":
+		allOptions.OhGlobalModulePaths = ParseStringArray(value)
+	case "ohArkUIDeclarationDirs":
+		allOptions.OhArkUIDeclarationDirs = ParseStringArray(value)
+	case "ohRequestPermissions":
+		allOptions.OhRequestPermissions = ParseStringArray(value)
+	case "ohSyscapIntersection":
+		allOptions.OhSyscapIntersection = ParseStringArray(value)
+	case "ohSyscapUnion":
+		allOptions.OhSyscapUnion = ParseStringArray(value)
+	case "ohDeviceTypes":
+		allOptions.OhDeviceTypes = ParseStringArray(value)
+	case "ohCardEntryFiles":
+		allOptions.OhCardEntryFiles = ParseStringArray(value)
+	case "ohCrossplatform":
+		allOptions.OhCrossplatform = ParseTristate(value)
+	case "ohIgnoreCrossplatformCheck":
+		allOptions.OhIgnoreCrossplatformCheck = ParseTristate(value)
+	case "ohCompileMode":
+		allOptions.OhCompileMode = ParseString(value)
+	case "ohBundleType":
+		allOptions.OhBundleType = ParseString(value)
+	case "ohApiCompatibilityCheck":
+		allOptions.OhApiCompatibilityCheck = ParseString(value)
 	case "forceConsistentCasingInFileNames":
 		allOptions.ForceConsistentCasingInFileNames = ParseTristate(value)
 	case "generateCpuProfile":

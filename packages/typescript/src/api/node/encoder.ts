@@ -18,6 +18,8 @@ import {
     HEADER_OFFSET_EXTENDED_DATA,
     HEADER_OFFSET_METADATA,
     HEADER_OFFSET_NODES,
+    HEADER_OFFSET_PARSE_OPTIONS,
+    HEADER_OFFSET_ETS_OPTIONS,
     HEADER_OFFSET_STRING_TABLE,
     HEADER_OFFSET_STRING_TABLE_OFFSETS,
     HEADER_OFFSET_STRUCTURED_DATA,
@@ -212,7 +214,7 @@ export function encodeNode(node: Node): Uint8Array {
     const nodeValues: number[] = [];
 
     // Nil node (index 0)
-    nodeValues.push(0, 0, 0, 0, 0, 0, 0);
+    nodeValues.push(0, 0, 0, 0, 0, 0, 0, 0);
 
     let nodeCount = 0;
     let parentIndex = 0;
@@ -236,6 +238,7 @@ export function encodeNode(node: Node): Uint8Array {
             parentIndex,
             data,
             node.flags,
+            node.virtual ? 1 : 0,
         );
 
         const saveParentIndex = parentIndex;
@@ -269,6 +272,7 @@ export function encodeNode(node: Node): Uint8Array {
             parentIndex,
             list.length, // data for NodeList is its length
             list.hasTrailingComma ? 1 : 0, // NodeLists have no AST flags; this slot is reused for hasTrailingComma
+            0,
         );
 
         const saveParentIndex = parentIndex;
@@ -314,6 +318,7 @@ export function encodeNode(node: Node): Uint8Array {
         0,
         rootData,
         node.flags,
+        node.virtual ? 1 : 0,
     );
 
     const saveParent = parentIndex;
@@ -333,6 +338,8 @@ export function encodeNode(node: Node): Uint8Array {
     const structuredDataBytes = structuredWriter.finish();
 
     // Encode string table
+    const parseOptions = node.kind === SyntaxKind.SourceFile ? (node as SourceFile).parseOptions : undefined;
+    const etsIndex = node.kind === SyntaxKind.SourceFile ? strs.add(JSON.stringify(parseOptions?.ets ?? {})) : NO_STRUCTURED_DATA;
     const strsBytes = strs.encode();
 
     // Encode nodes section
@@ -354,6 +361,8 @@ export function encodeNode(node: Node): Uint8Array {
     const headerView = new DataView(header.buffer);
     const metadata = PROTOCOL_VERSION << 24;
     headerView.setUint32(HEADER_OFFSET_METADATA, metadata, true);
+    headerView.setUint32(HEADER_OFFSET_PARSE_OPTIONS, parseOptions?.flags ?? 0, true);
+    headerView.setUint32(HEADER_OFFSET_ETS_OPTIONS, etsIndex, true);
     // bytes 4-19: hash (zero for non-SourceFile, we don't have access to xxh3 here)
     // byte 20-23: parse options (zero for non-SourceFile)
     headerView.setUint32(HEADER_OFFSET_STRING_TABLE_OFFSETS, offsetStringTableOffsets, true);

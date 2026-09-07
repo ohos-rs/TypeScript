@@ -52,7 +52,11 @@ type Diagnostic struct {
 	reportsUnnecessary bool
 	reportsDeprecated  bool
 	skippedOnNoEmit    bool
-	repopulateInfo     *RepopulateDiagnosticInfo
+	// filterFlag is the OpenHarmony strict-checker marker carried by a
+	// DiagnosticMessageChain. ArkTSLinter_1_1 uses it to distinguish unknown
+	// errors introduced by strict variance from ordinary unknown assignments.
+	filterFlag     bool
+	repopulateInfo *RepopulateDiagnosticInfo
 }
 
 func (d *Diagnostic) File() *SourceFile                         { return d.file }
@@ -71,12 +75,17 @@ func (d *Diagnostic) RelatedInformation() []*Diagnostic         { return d.relat
 func (d *Diagnostic) ReportsUnnecessary() bool                  { return d.reportsUnnecessary }
 func (d *Diagnostic) ReportsDeprecated() bool                   { return d.reportsDeprecated }
 func (d *Diagnostic) SkippedOnNoEmit() bool                     { return d.skippedOnNoEmit }
+func (d *Diagnostic) FilterFlag() bool                          { return d.filterFlag }
 func (d *Diagnostic) RepopulateInfo() *RepopulateDiagnosticInfo { return d.repopulateInfo }
 
-func (d *Diagnostic) SetFile(file *SourceFile)                         { d.file = file }
-func (d *Diagnostic) SetLocation(loc core.TextRange)                   { d.loc = loc }
-func (d *Diagnostic) SetCategory(category diagnostics.Category)        { d.category = category }
-func (d *Diagnostic) SetSkippedOnNoEmit()                              { d.skippedOnNoEmit = true }
+func (d *Diagnostic) SetFile(file *SourceFile)                  { d.file = file }
+func (d *Diagnostic) SetLocation(loc core.TextRange)            { d.loc = loc }
+func (d *Diagnostic) SetCategory(category diagnostics.Category) { d.category = category }
+func (d *Diagnostic) SetSkippedOnNoEmit()                       { d.skippedOnNoEmit = true }
+func (d *Diagnostic) SetFilterFlag() *Diagnostic {
+	d.filterFlag = true
+	return d
+}
 func (d *Diagnostic) SetRepopulateInfo(info *RepopulateDiagnosticInfo) { d.repopulateInfo = info }
 
 func (d *Diagnostic) SetExternalData(source string, messageText string) *Diagnostic {
@@ -420,7 +429,7 @@ func getDiagnosticMessageIdentity(diagnostic *Diagnostic) string {
 	if diagnostic.MessageText() != "" {
 		return diagnostic.MessageText()
 	}
-	if diagnostic.message != nil && diagnostic.Code() == -1 {
+	if diagnostic.message != nil && (diagnostic.Code() == -1 || diagnostic.MessageKey() == "") {
 		return diagnostic.message.String()
 	}
 	return string(diagnostic.MessageKey())

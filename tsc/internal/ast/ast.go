@@ -103,6 +103,7 @@ func (f *NodeFactory) AsNodeFactory() *NodeFactory {
 func updateNode(updated *Node, original *Node, hooks NodeFactoryHooks) *Node {
 	if updated != original {
 		updated.Flags = original.Flags
+		updated.Virtual = original.Virtual
 		updated.Loc = original.Loc
 		if hooks.OnUpdate != nil {
 			hooks.OnUpdate(updated, original)
@@ -141,7 +142,9 @@ func (list *NodeList) HasTrailingComma() bool {
 		return false
 	}
 	last := list.Nodes[len(list.Nodes)-1]
-	return last.End() < list.End()
+	// OH virtual argument/member lists have no trailing comma. Their
+	// zero-width synthetic positions cannot encode the ordinary comma test.
+	return !last.Virtual && last.End() < list.End()
 }
 
 func (list *NodeList) Clone(f NodeFactoryCoercible) *NodeList {
@@ -178,12 +181,13 @@ func (list *ModifierList) Clone(f *NodeFactory) *ModifierList {
 // interface valued properties either store a true nil or a reference to a non-nil struct.
 
 type Node struct {
-	Kind   Kind
-	Flags  NodeFlags
-	Loc    core.TextRange
-	id     atomic.Uint64
-	Parent *Node
-	data   nodeData
+	Kind    Kind
+	Virtual bool // OH finishVirtualNode; distinct from transformation-synthesized nodes.
+	Flags   NodeFlags
+	Loc     core.TextRange
+	id      atomic.Uint64
+	Parent  *Node
+	data    nodeData
 }
 
 // Node accessors. Some accessors are implemented as methods on NodeData, others are implemented though

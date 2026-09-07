@@ -586,6 +586,10 @@ type Checker struct {
 	id                                          uint32
 	program                                     Program
 	compilerOptions                             *core.CompilerOptions
+	isForArkTSLinter                            bool
+	etsLibFiles                                 map[string]struct{}
+	throws                                      *throwsChecker
+	ohAvailableNodeChecks                       map[string]struct{}
 	files                                       []*ast.SourceFile
 	fileIndexMap                                map[*ast.SourceFile]int
 	compareSymbols                              func(*ast.Symbol, *ast.Symbol) int
@@ -672,6 +676,7 @@ type Checker struct {
 	mergedSymbols                               map[*ast.Symbol]*ast.Symbol
 	factory                                     ast.NodeFactory
 	nodeLinks                                   core.LinkStore[*ast.Node, NodeLinks]
+	annotationLinks                             nodeLinkStore[AnnotationLinks]
 	signatureLinks                              core.LinkStore[*ast.Node, SignatureLinks]
 	symbolNodeLinks                             nodeLinkStore[SymbolNodeLinks]
 	typeNodeLinks                               core.LinkStore[*ast.Node, TypeNodeLinks]
@@ -908,14 +913,33 @@ type Checker struct {
 }
 
 func NewChecker(program Program, tracer *Tracer) (*Checker, *sync.Mutex) {
+	return newChecker(program, program.Options(), false, tracer)
+}
+
+// NewArkTSLinterChecker creates the second checker used by the OpenHarmony
+// ArkTS 1.1 linter. The upstream checker owns a separate TypeChecker over the
+// same Program and overrides exactly these four strict options; it does not
+// create or reparse a second Program.
+func NewArkTSLinterChecker(program Program, tracer *Tracer) (*Checker, *sync.Mutex) {
+	options := program.Options().Clone()
+	options.StrictNullChecks = core.TSTrue
+	options.StrictFunctionTypes = core.TSTrue
+	options.StrictPropertyInitialization = core.TSTrue
+	options.NoImplicitReturns = core.TSTrue
+	return newChecker(program, options, true, tracer)
+}
+
+func newChecker(program Program, options *core.CompilerOptions, isForArkTSLinter bool, tracer *Tracer) (*Checker, *sync.Mutex) {
 	program.BindSourceFiles()
 
 	c := &Checker{}
 	c.id = nextCheckerID.Add(1)
 	c.tracer = tracer
 	c.program = program
-	c.compilerOptions = program.Options()
+	c.compilerOptions = options
+	c.isForArkTSLinter = isForArkTSLinter
 	c.files = program.SourceFiles()
+	c.initializeEtsLibFiles()
 	c.fileIndexMap = createFileIndexMap(c.files)
 	c.compareSymbols = c.compareSymbolsWorker           // Closure optimization
 	c.compareSymbolChains = c.compareSymbolChainsWorker // Closure optimization
@@ -1812,8 +1836,8 @@ func getPrimitiveTypeAliasSuggestions(symbols ast.SymbolTable) iter.Seq[*ast.Sym
 	}
 }
 
-func (c *Checker) getSuggestionForSymbolNameLookup(symbols ast.SymbolTable, name string, meaning ast.SymbolFlags) *ast.Symbol {
-	symbol := c.getSymbol(symbols, name, meaning)
+func (c *Checker) getSuggestionForSymbolNameLookup(symbols ast.SymbolTable, name string, meaning ast.SymbolFlags, location ...*ast.Node) *ast.Symbol {
+	symbol := c.getSymbol(symbols, name, meaning, location...)
 	if symbol != nil {
 		return symbol
 	}
@@ -1943,6 +1967,10 @@ func (c *Checker) checkResolvedBlockScopedVariable(result *ast.Symbol, errorLoca
 		declarationName := scanner.DeclarationNameToString(ast.GetNameOfDeclaration(declaration))
 		if result.Flags&ast.SymbolFlagsBlockScopedVariable != 0 {
 			diagnostic = c.error(errorLocation, diagnostics.Block_scoped_variable_0_used_before_its_declaration, declarationName)
+		} else if isAnnotationSymbol(result) {
+			// OH checkResolvedBlockScopedVariable gives annotations their own
+			// diagnostic, while retaining the lexical scope/ambient checks.
+			diagnostic = c.error(errorLocation, diagnostics.Annotation_0_used_before_its_declaration, declarationName)
 		} else if result.Flags&ast.SymbolFlagsClass != 0 {
 			diagnostic = c.error(errorLocation, diagnostics.Class_0_used_before_its_declaration, declarationName)
 		} else if result.Flags&ast.SymbolFlagsRegularEnum != 0 {
@@ -2213,10 +2241,13 @@ func (c *Checker) addTypeOnlyDeclarationRelatedInfo(diagnostic *ast.Diagnostic, 
 	return diagnostic.AddRelatedInfo(NewDiagnosticForNode(typeOnlyDeclaration, core.IfElse(isExport, diagnostics.X_0_was_exported_here, diagnostics.X_0_was_imported_here), name))
 }
 
-func (c *Checker) getSymbol(symbols ast.SymbolTable, name string, meaning ast.SymbolFlags) *ast.Symbol {
+func (c *Checker) getSymbol(symbols ast.SymbolTable, name string, meaning ast.SymbolFlags, location ...*ast.Node) *ast.Symbol {
 	if meaning&ast.SymbolFlagsAll != 0 {
 		symbol := c.getMergedSymbol(symbols[name])
 		if symbol != nil {
+			if len(location) != 0 && !c.isValidFromEtsLibs(symbol, location[0]) {
+				return nil
+			}
 			if symbol.Flags&meaning != 0 {
 				return symbol
 			}
@@ -2741,6 +2772,10 @@ func (c *Checker) checkParameter(node *ast.Node) {
 }
 
 func (c *Checker) checkPropertyDeclaration(node *ast.Node) {
+	if ast.IsAnnotationPropertyDeclaration(node) {
+		c.checkAnnotationPropertyDeclaration(node)
+		return
+	}
 	// Grammar checking
 	if !c.checkGrammarModifiers(node) && !c.checkGrammarProperty(node) {
 		c.checkGrammarComputedPropertyName(node.Name())
@@ -2864,6 +2899,10 @@ func (c *Checker) checkClassStaticBlockDeclaration(node *ast.Node) {
 }
 
 func (c *Checker) checkConstructorDeclaration(node *ast.Node) {
+	// OH checkConstructorDeclaration does not check parser-created constructors.
+	if node.Virtual {
+		return
+	}
 	// Grammar check on signature of constructor and modifier of the constructor is done in checkSignatureDeclaration function.
 	c.checkSignatureDeclaration(node)
 	// Grammar check for checking only related to constructorDeclaration
@@ -3041,6 +3080,9 @@ func (c *Checker) checkTypeReferenceNode(node *ast.Node) {
 
 func (c *Checker) checkTypeReferenceOrImport(node *ast.Node) {
 	t := c.getTypeFromTypeNode(node)
+	if isAnnotationSymbol(t.symbol) {
+		c.error(node, diagnostics.Annotation_cannot_be_used_as_a_type)
+	}
 	if !c.isErrorType(t) {
 		if len(node.TypeArguments()) != 0 {
 			typeParameters := c.getTypeParametersForTypeReferenceOrImport(node)
@@ -3756,7 +3798,13 @@ func (c *Checker) checkAllCodePathsInNonVoidFunctionReturnOrThrow(fn *ast.Node, 
 	}
 	// Functions with an explicitly specified return type that includes `void` or is exactly `any` or `undefined` don't
 	// need any return statements.
-	if t != nil && (c.maybeTypeOfKind(t, TypeFlagsVoid) || t.flags&(TypeFlagsAny|TypeFlagsUndefined) != 0) {
+	if t != nil && (c.maybeTypeOfKind(t, TypeFlagsVoid) || t.flags&TypeFlagsAny != 0) {
+		return
+	}
+	if c.checkEtsStyleReturnType(fn, returnType) {
+		return
+	}
+	if t != nil && t.flags&TypeFlagsUndefined != 0 {
 		return
 	}
 	// If all we have is a function signature, or an arrow function with an expression body, then there is nothing to check.
@@ -4299,7 +4347,15 @@ func (c *Checker) checkBindingElement(node *ast.Node) {
 }
 
 func (c *Checker) checkClassDeclaration(node *ast.Node) {
-	firstDecorator := core.Find(node.ModifierNodes(), func(n *ast.Node) bool { return ast.IsDecorator(n) && !ast.IsArkUICompilerDecorator(n) })
+	if ast.IsAnnotationDeclaration(node) {
+		c.checkAnnotationDeclaration(node)
+		return
+	}
+	if ast.IsStructDeclaration(node) {
+		c.checkStructDeclaration(node)
+		return
+	}
+	firstDecorator := core.Find(node.ModifierNodes(), ast.IsDecorator)
 	if c.legacyDecorators && firstDecorator != nil && core.Some(node.Members(), func(p *ast.Node) bool {
 		return ast.HasStaticModifier(p) && ast.IsPrivateIdentifierClassElementDeclaration(p)
 	}) {
@@ -4309,6 +4365,18 @@ func (c *Checker) checkClassDeclaration(node *ast.Node) {
 		c.grammarErrorOnFirstToken(node, diagnostics.A_class_declaration_without_the_default_modifier_must_have_a_name)
 	}
 	c.checkClassLikeDeclaration(node)
+	c.checkSourceElements(node.Members())
+	c.registerForUnusedIdentifiersCheck(node)
+}
+
+func (c *Checker) checkStructDeclaration(node *ast.Node) {
+	if node.Name() == nil && !ast.HasSyntacticModifier(node, ast.ModifierFlagsDefault) {
+		c.grammarErrorOnFirstToken(node, diagnostics.A_struct_declaration_without_the_default_modifier_must_have_a_name)
+	}
+	c.checkClassLikeDeclaration(node)
+	if node.Name() != nil && ast.IsIdentifier(node.Name()) && c.compilerOptions.Ets.Components.Contains(node.Name().Text()) {
+		c.error(node.Name(), diagnostics.The_struct_name_cannot_contain_reserved_tag_name_Colon_0, node.Name().Text())
+	}
 	c.checkSourceElements(node.Members())
 	c.registerForUnusedIdentifiersCheck(node)
 }
@@ -5022,9 +5090,6 @@ func (c *Checker) checkPropertyInitialization(node *ast.Node) {
 	}
 	constructor := ast.FindConstructorDeclaration(node)
 	for _, member := range node.Members() {
-		if ast.IsStructDeclaration(node) && ast.HasArkUIDecorator(member.Modifiers(), "Prop", "Link", "Consume", "ObjectLink", "StorageLink", "StorageProp", "LocalStorageLink", "LocalStorageProp", "BuilderParam", "Param", "Event", "Consumer") {
-			continue
-		}
 		if member.ModifierFlags()&ast.ModifierFlagsAmbient != 0 {
 			continue
 		}
@@ -5713,6 +5778,9 @@ func (c *Checker) checkExternalModuleNameInGlobalScope(node *ast.Node) {
 
 func (c *Checker) checkExportSpecifier(node *ast.ExportSpecifierNode) {
 	c.checkAliasSymbol(node)
+	if isAnnotationSymbol(c.resolveAlias(c.getSymbolOfDeclaration(node))) {
+		c.error(node, diagnostics.Annotation_can_only_be_exported_in_declaration_statement)
+	}
 	hasModuleSpecifier := node.Parent.Parent.ModuleSpecifier() != nil
 	c.checkModuleExportName(node.PropertyName(), hasModuleSpecifier)
 	c.checkModuleExportName(node.Name(), true /*allowStringLiteral*/)
@@ -5744,6 +5812,11 @@ func isContainedByNamespace(node *ast.Node) bool {
 }
 
 func (c *Checker) checkExportAssignment(node *ast.Node) {
+	if expression := node.Expression(); ast.IsIdentifier(expression) || ast.IsPropertyAccessExpression(expression) {
+		if isAnnotationSymbol(c.getSymbolOfNameOrPropertyAccessExpression(expression)) && !node.AsExportAssignment().IsExportEquals {
+			c.error(node, diagnostics.Annotation_cannot_be_exported_as_default)
+		}
+	}
 	isExportEquals := node.AsExportAssignment().IsExportEquals
 	// Always check the exported expression so its identifiers are resolved even when the
 	// export assignment is misplaced (grammar error), keeping diagnostics stable
@@ -6188,12 +6261,22 @@ func (c *Checker) checkVarDeclaredNamesNotShadowed(node *ast.Node) {
 }
 
 func (c *Checker) checkDecorators(node *ast.Node) {
+	isEts := ast.GetSourceFileOfNode(node).ScriptKind == core.ScriptKindETS
+	// OH checkDecorators resolves bare identifiers even on illegal-decorator
+	// targets (e.g. configured Builder functions), before its semantic gate.
+	if isEts {
+		for _, modifier := range node.ModifierNodes() {
+			if ast.IsDecorator(modifier) && ast.IsIdentifier(modifier.Expression()) && c.annotationForDecorator(modifier) == nil {
+				c.getResolvedSymbol(modifier.Expression())
+			}
+		}
+	}
 	// skip this check for nodes that cannot have decorators. These should have already had an error reported by
 	// checkGrammarModifiers.
 	if !ast.CanHaveDecorators(node) || !ast.HasDecorators(node) || !ast.NodeCanBeDecorated(c.legacyDecorators, node, node.Parent, node.Parent.Parent) {
 		return
 	}
-	firstDecorator := core.Find(node.ModifierNodes(), func(n *ast.Node) bool { return ast.IsDecorator(n) && !ast.IsArkUICompilerDecorator(n) })
+	firstDecorator := core.Find(node.ModifierNodes(), ast.IsDecorator)
 	if firstDecorator == nil {
 		return
 	}
@@ -6220,13 +6303,17 @@ func (c *Checker) checkDecorators(node *ast.Node) {
 	}
 	c.markLinkedReferences(node, ReferenceHintDecorator, nil, nil)
 	for _, modifier := range node.ModifierNodes() {
-		if ast.IsDecorator(modifier) && !ast.IsArkUICompilerDecorator(modifier) {
+		if ast.IsDecorator(modifier) {
 			c.checkDecorator(modifier)
 		}
 	}
 }
 
 func (c *Checker) checkDecorator(node *ast.Node) {
+	if declaration := c.annotationForDecorator(node); declaration != nil {
+		c.checkAnnotationUse(node, declaration)
+		return
+	}
 	c.checkGrammarDecorator(node.AsDecorator())
 	signature := c.getResolvedSignature(node, nil, CheckModeNormal)
 	c.checkDeprecatedSignature(signature, node)
@@ -6904,6 +6991,9 @@ func isES2015OrLaterIterable(n string) bool {
 func (c *Checker) checkAliasSymbol(node *ast.Node) {
 	symbol := c.getSymbolOfDeclaration(node)
 	target := c.resolveAlias(symbol)
+	if isAnnotationSymbol(target) && (ast.IsImportSpecifier(node) || ast.IsExportSpecifier(node)) && node.PropertyName() != nil {
+		c.error(node, diagnostics.Annotation_cannot_be_renamed_in_import_or_export)
+	}
 	if target == c.unknownSymbol {
 		return
 	}
@@ -7903,9 +7993,6 @@ func (c *Checker) checkExpressionWorker(node *ast.Node, checkMode CheckMode) *Ty
 	case ast.KindPrivateIdentifier:
 		return c.checkPrivateIdentifierExpression(node)
 	case ast.KindThisKeyword:
-		if node.Flags&ast.NodeFlagsEtsImplicitReceiver != 0 {
-			return c.getArkUIImplicitReceiverType(node)
-		}
 		return c.checkThisExpression(node)
 	case ast.KindSuperKeyword:
 		return c.checkSuperExpression(node)
@@ -7954,10 +8041,6 @@ func (c *Checker) checkExpressionWorker(node *ast.Node, checkMode CheckMode) *Ty
 	case ast.KindClassExpression:
 		return c.checkClassExpression(node)
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
-		if node.Flags&ast.NodeFlagsEtsStylesBlock != 0 {
-			c.checkSourceElement(node.Body())
-			return c.getArkUIImplicitReceiverType(node)
-		}
 		return c.checkFunctionExpressionOrObjectLiteralMethod(node, checkMode)
 	case ast.KindTypeAssertionExpression, ast.KindAsExpression:
 		return c.checkAssertion(node, checkMode)
@@ -8501,12 +8584,14 @@ func (c *Checker) checkCallExpression(node *ast.Node, checkMode CheckMode) *Type
 		c.checkSourceElement(node.AsCallExpression().EtsBody)
 	}
 	c.checkGrammarTypeArguments(node, node.TypeArgumentList())
+	c.checkApiAvailableVersion(node)
 	signature := c.getResolvedSignature(node, nil /*candidatesOutArray*/, checkMode)
 	if signature == c.resolvingSignature {
 		// CheckMode.SkipGenericFunctions is enabled and this is a call to a generic function that
 		// returns a function type. We defer checking and return silentNeverType.
 		return c.silentNeverType
 	}
+	c.checkOHSDKOverloadUse(node, signature.declaration)
 	c.checkDeprecatedSignature(signature, node)
 	if node.Expression().Kind == ast.KindSuperKeyword {
 		return c.voidType
@@ -8538,6 +8623,14 @@ func (c *Checker) checkCallExpression(node *ast.Node, checkMode CheckMode) *Type
 			c.getTypeOfDottedName(node.Expression(), diagnostic)
 		}
 	}
+	// OH checker.ts permits SDK system components only inside configured
+	// render/page-transition methods or functions/methods carrying a configured
+	// bare render decorator.
+	if ast.GetSourceFileOfNode(node).ScriptKind == core.ScriptKindETS && ast.IsIdentifier(node.Expression()) && !ast.IsNewExpression(node) &&
+		c.isSystemEtsComponent(node.Expression()) && !c.isInBuildOrPageTransitionContext(node) {
+		c.error(node.Expression(), diagnostics.UI_component_0_cannot_be_used_in_this_place, node.Expression().Text())
+	}
+	c.checkThrowsCall(node, signature.declaration)
 	return returnType
 }
 
@@ -8701,13 +8794,9 @@ func (c *Checker) resolveCallExpression(node *ast.Node, candidatesOutArray *[]*S
 	// but we are not including call signatures that may have been added to the Object or
 	// Function interface, since they have none by default. This is a bit of a leap of faith
 	// that the user will not add any.
-	if ast.IsEtsComponentExpression(node) {
-		if signature := c.getArkUIStructSignature(apparentType); signature != nil {
-			return c.resolveCall(node, []*Signature{signature}, candidatesOutArray, checkMode, SignatureFlagsNone, nil)
-		}
-	}
 	callSignatures := c.getSignaturesOfType(apparentType, SignatureKindCall)
-	numConstructSignatures := len(c.getSignaturesOfType(apparentType, SignatureKindConstruct))
+	constructSignatures := c.getSignaturesOfType(apparentType, SignatureKindConstruct)
+	numConstructSignatures := len(constructSignatures)
 	// TS 1.0 Spec: 4.12
 	// In an untyped function call no TypeArgs are permitted, Args can be any argument list, no contextual
 	// types are provided for the argument expressions, and the result is always of type Any.
@@ -8724,6 +8813,11 @@ func (c *Checker) resolveCallExpression(node *ast.Node, candidatesOutArray *[]*S
 	// with multiple call signatures.
 	if len(callSignatures) == 0 {
 		if numConstructSignatures != 0 {
+			// OH resolveCallExpression/isCalledStructDeclaration: ordinary calls
+			// to structs use their real, parser-created construct signatures too.
+			if apparentType.symbol != nil && core.Some(apparentType.symbol.Declarations, ast.IsStructDeclaration) {
+				return c.resolveCall(node, constructSignatures, candidatesOutArray, checkMode, SignatureFlagsNone, nil)
+			}
 			c.error(node, diagnostics.Value_of_type_0_is_not_callable_Did_you_mean_to_include_new, c.TypeToString(funcType))
 		} else {
 			var relatedInformation *ast.Diagnostic
@@ -8936,7 +9030,7 @@ func (c *Checker) resolveTaggedTemplateExpression(node *ast.Node, candidatesOutA
 }
 
 func (c *Checker) resolveDecorator(node *ast.Node, candidatesOutArray *[]*Signature, checkMode CheckMode) *Signature {
-	if !ast.CanHaveDecorators(node.Parent) {
+	if !ast.CanHaveDecorators(node.Parent) && !(ast.IsFunctionDeclaration(node.Parent) && ast.IsEtsFunctionDecorator(node, c.compilerOptions.Ets)) {
 		return c.resolveErrorCall(node)
 	}
 	funcType := c.checkExpression(node.Expression())
@@ -8988,6 +9082,10 @@ func (c *Checker) getDiagnosticHeadMessageForDecoratorResolution(node *ast.Node)
 		return diagnostics.Unable_to_resolve_signature_of_property_decorator_when_called_as_an_expression
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		return diagnostics.Unable_to_resolve_signature_of_method_decorator_when_called_as_an_expression
+	case ast.KindFunctionDeclaration:
+		if ast.IsEtsFunctionDecorator(node, c.compilerOptions.Ets) {
+			return diagnostics.Unable_to_resolve_signature_of_function_decorator_when_decorators_are_not_valid
+		}
 	}
 	panic("Unhandled case in getDiagnosticHeadMessageForDecoratorResolution")
 }
@@ -9223,7 +9321,7 @@ func (c *Checker) chooseOverload(s *CallState, relation *Relation) *Signature {
 	s.candidateForTypeArgumentError = nil
 	if s.isSingleNonGenericCandidate {
 		candidate := s.candidates[0]
-		if len(s.typeArguments) != 0 || !c.hasCorrectArity(s.node, s.args, candidate, s.signatureHelpTrailingComma) {
+		if len(s.typeArguments) != 0 && !core.Some(s.typeArguments, func(node *ast.Node) bool { return node.Virtual }) || !c.hasCorrectArity(s.node, s.args, candidate, s.signatureHelpTrailingComma) {
 			return nil
 		}
 		if !c.isSignatureApplicable(s.node, s.args, candidate, relation, CheckModeNormal, false /*reportErrors*/, nil /*diagnosticOutput*/) {
@@ -9402,6 +9500,10 @@ func (c *Checker) getLegacyDecoratorArgumentCount(node *ast.Node, signature *Sig
 		return 3
 	case ast.KindParameter:
 		return 3
+	case ast.KindFunctionDeclaration:
+		if ast.IsEtsFunctionDecorator(node, c.compilerOptions.Ets) {
+			return core.IfElse(ast.IsCallExpression(node.Expression()), 1, 0)
+		}
 	}
 	panic("Unhandled case in getLegacyDecoratorArgumentCount")
 }
@@ -9411,6 +9513,11 @@ func (c *Checker) hasCorrectTypeArgumentArity(signature *Signature, typeArgument
 	// the declared number of type parameters, the call has an incorrect arity.
 	numTypeParameters := len(signature.typeParameters)
 	minTypeArgumentCount := c.getMinTypeArgumentCount(signature.typeParameters)
+	// OH hasCorrectTypeArgumentArity treats the virtual attribute argument
+	// as one parameter even on ordinary non-generic SDK methods.
+	if core.Some(typeArguments, func(node *ast.Node) bool { return node.Virtual }) {
+		numTypeParameters, minTypeArgumentCount = 1, 1
+	}
 	return len(typeArguments) == 0 || len(typeArguments) >= minTypeArgumentCount && len(typeArguments) <= numTypeParameters
 }
 
@@ -9842,6 +9949,113 @@ func (c *Checker) tryGetRestTypeOfSignature(signature *Signature) *Type {
 }
 
 func (c *Checker) reportCallResolutionErrors(node *ast.Node, s *CallState, signatures []*Signature, headMessage *diagnostics.Message) {
+	if ast.GetSourceFileOfNode(node).ScriptKind != core.ScriptKindETS {
+		c.reportTypeScriptCallResolutionErrors(node, s, signatures, headMessage)
+		return
+	}
+	switch {
+	case len(s.candidatesForArgumentError) != 0:
+		if len(s.candidatesForArgumentError) == 1 || len(s.candidatesForArgumentError) > 3 {
+			last := s.candidatesForArgumentError[len(s.candidatesForArgumentError)-1]
+			var diags []*ast.Diagnostic
+			c.isSignatureApplicable(s.node, s.args, last, c.assignableRelation, CheckModeNormal, true /*reportErrors*/, &diags)
+			for _, diagnostic := range diags {
+				if len(s.candidatesForArgumentError) > 3 {
+					diagnostic = ast.NewDiagnosticChain(diagnostic, diagnostics.The_last_overload_gave_the_following_error)
+					diagnostic = ast.NewDiagnosticChain(diagnostic, diagnostics.No_overload_matches_this_call)
+				}
+				if headMessage != nil {
+					diagnostic = ast.NewDiagnosticChain(diagnostic, headMessage)
+				}
+				if last.declaration != nil && len(s.candidatesForArgumentError) > 3 {
+					diagnostic.AddRelatedInfo(NewDiagnosticForNode(last.declaration, diagnostics.The_last_overload_is_declared_here))
+				}
+				c.addImplementationSuccessElaboration(s, last, diagnostic)
+				c.addDiagnostic(diagnostic)
+			}
+		} else {
+			allDiagnostics := make([][]*ast.Diagnostic, 0, len(s.candidatesForArgumentError))
+			minDiagnostics := int(^uint(0) >> 1)
+			minIndex := 0
+			maxDiagnostics := 0
+			for index, candidate := range s.candidatesForArgumentError {
+				var candidateDiagnostics []*ast.Diagnostic
+				c.isSignatureApplicable(s.node, s.args, candidate, c.assignableRelation, CheckModeNormal, true /*reportErrors*/, &candidateDiagnostics)
+				if len(candidateDiagnostics) <= minDiagnostics {
+					minDiagnostics = len(candidateDiagnostics)
+					minIndex = index
+				}
+				maxDiagnostics = max(maxDiagnostics, len(candidateDiagnostics))
+				allDiagnostics = append(allDiagnostics, candidateDiagnostics)
+			}
+			var selected []*ast.Diagnostic
+			if maxDiagnostics > 1 {
+				selected = allDiagnostics[minIndex]
+			} else {
+				for _, candidateDiagnostics := range allDiagnostics {
+					selected = append(selected, candidateDiagnostics...)
+				}
+			}
+			if len(selected) != 0 {
+				chains := make([]*ast.Diagnostic, 0, len(selected))
+				related := make([]*ast.Diagnostic, 0)
+				for index, diagnostic := range selected {
+					candidateIndex := index
+					if maxDiagnostics > 1 {
+						candidateIndex = minIndex
+					}
+					candidate := s.candidatesForArgumentError[candidateIndex]
+					chains = append(chains, ast.NewDiagnosticChain(
+						diagnostic,
+						diagnostics.Overload_0_of_1_2_gave_the_following_error,
+						candidateIndex+1,
+						len(signatures),
+						c.signatureToString(candidate),
+					))
+					related = append(related, diagnostic.RelatedInformation()...)
+				}
+				first := selected[0]
+				sameRange := true
+				for _, diagnostic := range selected[1:] {
+					if diagnostic.File() != first.File() || diagnostic.Loc() != first.Loc() {
+						sameRange = false
+						break
+					}
+				}
+				var diagnostic *ast.Diagnostic
+				if sameRange {
+					diagnostic = ast.NewDiagnostic(first.File(), first.Loc(), diagnostics.No_overload_matches_this_call)
+				} else {
+					diagnostic = NewDiagnosticForNode(node, diagnostics.No_overload_matches_this_call)
+				}
+				diagnostic.SetMessageChain(chains).SetRelatedInfo(related)
+				if headMessage != nil {
+					diagnostic = ast.NewDiagnosticChain(diagnostic, headMessage)
+				}
+				c.addImplementationSuccessElaboration(s, s.candidatesForArgumentError[0], diagnostic)
+				c.addDiagnostic(diagnostic)
+			}
+		}
+	case s.candidateForArgumentArityError != nil:
+		c.addDiagnostic(c.getArgumentArityError(s.node, []*Signature{s.candidateForArgumentArityError}, s.args, headMessage))
+	case s.candidateForTypeArgumentError != nil:
+		c.checkTypeArguments(s.candidateForTypeArgumentError, s.node.TypeArguments(), true /*reportErrors*/, headMessage)
+	case !ast.IsJsxOpeningFragment(node):
+		signaturesWithCorrectTypeArgumentArity := core.Filter(signatures, func(sig *Signature) bool {
+			return c.hasCorrectTypeArgumentArity(sig, s.typeArguments)
+		})
+		if len(signaturesWithCorrectTypeArgumentArity) == 0 {
+			c.addDiagnostic(c.getTypeArgumentArityError(s.node, signatures, s.typeArguments, headMessage))
+		} else {
+			c.addDiagnostic(c.getArgumentArityError(s.node, signaturesWithCorrectTypeArgumentArity, s.args, headMessage))
+		}
+	}
+}
+
+// reportTypeScriptCallResolutionErrors preserves the current TypeScript
+// overload diagnostic selection. OpenHarmony's checker uses the older
+// multi-candidate diagnostic shape only for ETS source files.
+func (c *Checker) reportTypeScriptCallResolutionErrors(node *ast.Node, s *CallState, signatures []*Signature, headMessage *diagnostics.Message) {
 	switch {
 	case len(s.candidatesForArgumentError) != 0:
 		last := s.candidatesForArgumentError[len(s.candidatesForArgumentError)-1]
@@ -10648,7 +10862,11 @@ func (c *Checker) checkCollisionsForDeclarationName(node *ast.Node, name *ast.No
 	c.recordPotentialCollisionWithWeakMapSetInGeneratedCode(node, name)
 	c.recordPotentialCollisionWithReflectInGeneratedCode(node, name)
 	if ast.IsClassLike(node) {
-		c.checkTypeNameIsReserved(name, diagnostics.Class_name_cannot_be_0)
+		if ast.IsAnnotationDeclaration(node) {
+			c.checkTypeNameIsReserved(name, diagnostics.Annotation_name_cannot_be_0)
+		} else {
+			c.checkTypeNameIsReserved(name, diagnostics.Class_name_cannot_be_0)
+		}
 		if node.Flags&ast.NodeFlagsAmbient == 0 {
 			c.checkClassNameCollisionWithObject(name)
 		}
@@ -11240,9 +11458,6 @@ func (c *Checker) checkSyntheticExpression(node *ast.Node) *Type {
 }
 
 func (c *Checker) checkIdentifier(node *ast.Node, checkMode CheckMode) *Type {
-	if node.Flags&ast.NodeFlagsEtsBinding != 0 && node.Text() == "$$this" {
-		return c.checkThisExpression(node)
-	}
 	if ast.IsThisInTypeQuery(node) {
 		return c.checkThisExpression(node)
 	}
@@ -11262,6 +11477,13 @@ func (c *Checker) checkIdentifier(node *ast.Node, checkMode CheckMode) *Type {
 	}
 	localOrExportSymbol := c.getExportSymbolOfValueSymbolIfExported(symbol)
 	targetSymbol := c.resolveAliasWithDeprecationCheck(localOrExportSymbol, node)
+	c.checkOHSDKIdentifierUse(node, targetSymbol)
+	if isAnnotationSymbol(localOrExportSymbol) && ast.FindAncestor(node, func(n *ast.Node) bool {
+		return ast.IsAnnotationDeclaration(n) || ast.IsDecorator(n) || ast.IsImportDeclaration(n) || ast.IsExportDeclaration(n) || ast.IsExportAssignment(n)
+	}) == nil {
+		c.error(node, diagnostics.Annotation_cannot_be_used_as_type_or_variable_or_function_or_method)
+		return c.errorType
+	}
 	if len(targetSymbol.Declarations) != 0 && c.isDeprecatedSymbol(targetSymbol) && c.isUncalledFunctionReference(node, targetSymbol) {
 		c.addDeprecatedSuggestion(node, targetSymbol.Declarations, node.Text())
 	}
@@ -11525,7 +11747,7 @@ func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, l
 		}
 		prop = c.getPropertyOfTypeEx(apparentType, right.Text(), isConstEnumObjectType(apparentType) /*skipObjectFunctionPropertyAugment*/, node.Kind == ast.KindQualifiedName /*includeTypeOnlyMembers*/)
 		if prop == nil {
-			prop = c.getArkUIStyleProperty(node, left, right, leftType)
+			prop = c.getArkUIStyleProperty(node, left, right)
 		}
 	}
 	c.markLinkedReferences(node, ReferenceHintProperty, prop, leftType)
@@ -11572,6 +11794,7 @@ func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, l
 		}
 	} else {
 		targetPropSymbol := c.resolveAliasWithDeprecationCheck(prop, right)
+		c.checkOHSDKPropertyUse(right, targetPropSymbol)
 		if c.isDeprecatedSymbol(targetPropSymbol) && c.isUncalledFunctionReference(node, targetPropSymbol) && targetPropSymbol.Declarations != nil {
 			c.addDeprecatedSuggestion(right, targetPropSymbol.Declarations, right.Text())
 		}
@@ -11926,7 +12149,19 @@ func (c *Checker) checkPropertyNotUsedBeforeDeclaration(prop *ast.Symbol, node *
 		!c.isBlockScopedNameDeclaredBeforeUse(valueDeclaration, right) &&
 		!(ast.IsMethodDeclaration(valueDeclaration) && c.getCombinedModifierFlagsCached(valueDeclaration)&ast.ModifierFlagsStatic != 0) &&
 		(c.compilerOptions.GetUseDefineForClassFields() || !c.isPropertyDeclaredInAncestorClass(prop)) {
-		diagnostic = c.error(right, diagnostics.Property_0_is_used_before_its_initialization, declarationName)
+		allowUninitialized := false
+		for property := range c.compilerOptions.Ets.PropertyDecorators.Values() {
+			if !property.NeedInitialization && ast.HasArkUIBareDecorator(valueDeclaration.Modifiers(), property.Name) {
+				allowUninitialized = true
+				break
+			}
+		}
+		// OH checkStructPropertyPosition is a declaration/use position check,
+		// not an exemption from strictPropertyInitialization.
+		requiredBeforeUse := ast.HasArkUIBareDecorator(valueDeclaration.Modifiers(), "Require") && valueDeclaration.Pos() < node.Pos() && ast.IsStructDeclaration(valueDeclaration.Parent) && valueDeclaration.Parent.End() > node.End()
+		if !allowUninitialized && !requiredBeforeUse {
+			diagnostic = c.error(right, diagnostics.Property_0_is_used_before_its_initialization, declarationName)
+		}
 	} else if ast.IsClassDeclaration(valueDeclaration) && !ast.IsTypeReferenceNode(node.Parent) && valueDeclaration.Flags&ast.NodeFlagsAmbient == 0 && !c.isBlockScopedNameDeclaredBeforeUse(valueDeclaration, right) {
 		diagnostic = c.error(right, diagnostics.Class_0_used_before_its_declaration, declarationName)
 	}
@@ -13491,6 +13726,11 @@ func (c *Checker) checkObjectLiteral(node *ast.Node, checkMode CheckMode) *Type 
 				}
 				c.addIntraExpressionInferenceSite(inferenceContext, inferenceNode, t)
 			}
+			// OH checkObjectLiteral rejects annotation-valued properties in
+			// addition to the identifier-use diagnostic.
+			if isAnnotationSymbol(t.symbol) {
+				c.error(memberDecl, diagnostics.Annotation_cannot_be_used_as_a_value)
+			}
 		} else if memberDecl.Kind == ast.KindSpreadAssignment {
 			if len(propertiesArray) > 0 {
 				spread = c.getSpreadType(spread, createObjectLiteralType(), node.Symbol(), objectFlags, inConstContext)
@@ -14132,13 +14372,8 @@ func (c *Checker) getResolvedSymbol(node *ast.Node) *ast.Symbol {
 	if links.resolvedSymbol == nil {
 		var symbol *ast.Symbol
 		if !ast.NodeIsMissing(node) {
-			if node.Flags&ast.NodeFlagsEtsBinding != 0 {
-				symbol = c.getArkUIBindingSymbol(node)
-			}
-			if symbol == nil {
-				symbol = c.resolveName(node, node.Text(), ast.SymbolFlagsValue|ast.SymbolFlagsExportValue,
-					c.getCannotFindNameDiagnosticForName(node), !ast.IsWriteOnlyAccess(node), false /*excludeGlobals*/)
-			}
+			symbol = c.resolveName(node, node.Text(), ast.SymbolFlagsValue|ast.SymbolFlagsExportValue,
+				c.getCannotFindNameDiagnosticForName(node), !ast.IsWriteOnlyAccess(node), false /*excludeGlobals*/)
 		}
 		links.resolvedSymbol = core.OrElse(symbol, c.unknownSymbol)
 	}
@@ -15418,6 +15653,16 @@ func (c *Checker) resolveExternalModule(
 		importAttributesType = c.emptyObjectType
 	}
 
+	// OH checker.ts::resolveExternalModule checks this before ambient modules.
+	isSoFile := strings.Contains(moduleReference, ".so")
+	if c.compilerOptions.TsImportSoCheck != core.TSTrue && isSoFile &&
+		!(ast.GetSourceFileOfNode(location).ScriptKind == core.ScriptKindETS && c.compilerOptions.NeedDoArkTsLinter == core.TSTrue && c.compilerOptions.IsCompatibleVersion != core.TSTrue) {
+		if errorNode != nil {
+			c.reportUncheckedSoModule(errorNode, moduleReference)
+		}
+		return nil
+	}
+
 	ambientModule := c.tryFindAmbientModule(moduleReference, true /*withAugmentations*/)
 	if ambientModule != nil {
 		return c.tryResolvePatternAmbientModule(ambientModule, moduleReference, importAttributesType)
@@ -15472,14 +15717,25 @@ func (c *Checker) resolveExternalModule(
 	}
 
 	resolvedModule := c.program.GetResolvedModule(importingSourceFile, moduleReference, mode)
+	// OH checker.ts::resolveExternalModuleNameWorker reports a distinct error
+	// for project source importing a materialized path outside oh-exports. A
+	// dependency inside oh_modules is excluded from this check.
+	if resolvedModule != nil && resolvedModule.IsNotOhExport &&
+		!strings.Contains(tspath.NormalizePath(importingSourceFile.FileName()), "/oh_modules/") {
+		c.error(errorNode, diagnostics.Cannot_find_module_0_This_module_is_not_exported, moduleReference)
+		return nil
+	}
+	if resolvedModule != nil && resolvedModule.IsResolved() && (resolvedModule.Extension == tspath.ExtensionEts || resolvedModule.Extension == tspath.ExtensionDets) {
+		c.checkTsImportEts(importingSourceFile, contextSpecifier, errorNode)
+	}
 
 	var resolutionDiagnostic *diagnostics.Message
-	if errorNode != nil && resolvedModule.IsResolved() {
+	if errorNode != nil && resolvedModule != nil && resolvedModule.IsResolved() {
 		resolutionDiagnostic = module.GetResolutionDiagnostic(c.compilerOptions, resolvedModule, importingSourceFile)
 	}
 
 	var sourceFile *ast.SourceFile
-	if resolvedModule.IsResolved() && (resolutionDiagnostic == nil || resolutionDiagnostic == diagnostics.Module_0_was_resolved_to_1_but_jsx_is_not_set) {
+	if resolvedModule != nil && resolvedModule.IsResolved() && (resolutionDiagnostic == nil || resolutionDiagnostic == diagnostics.Module_0_was_resolved_to_1_but_jsx_is_not_set) {
 		sourceFile = c.program.GetSourceFileForResolvedModule(resolvedModule.ResolvedFileName)
 	}
 
@@ -15684,6 +15940,8 @@ func (c *Checker) resolveExternalModule(
 				} else {
 					c.error(errorNode, diagnostics.Relative_import_paths_need_explicit_file_extensions_in_ECMAScript_imports_when_moduleResolution_is_node16_or_nodenext_Consider_adding_an_extension_to_the_import_path)
 				}
+			} else if c.compilerOptions.TsImportSoCheck != core.TSTrue && isSoFile {
+				c.reportUncheckedSoModule(errorNode, moduleReference)
 			} else if resolvedModule != nil && resolvedModule.AlternateResult != "" {
 				errorInfo := c.createModuleNotFoundChain(resolvedModule, errorNode, moduleReference, mode, moduleReference)
 				c.addDiagnostic(NewDiagnosticChainForNode(errorInfo, errorNode, moduleNotFoundError, moduleReference))
@@ -21035,6 +21293,14 @@ func (c *Checker) resolveAnonymousTypeMembers(t *Type) {
 	c.setStructuredTypeMembers(t, members, nil, nil, nil)
 	if symbol.Flags&ast.SymbolFlagsClass != 0 {
 		classType := c.getDeclaredTypeOfClassOrInterface(symbol)
+		if isAnnotationSymbol(symbol) {
+			// OH resolveAnonymousTypeMembers: annotations are callable with one
+			// instance-shaped parameter, but have no construct signatures.
+			parameter := c.getPropertyOfType(c.getTypeOfSymbol(symbol), "prototype")
+			d.signatures = []*Signature{c.newSignature(SignatureFlagsNone, nil, nil, nil, []*ast.Symbol{parameter}, c.voidType, nil, 1)}
+			d.callSignatureCount = 1
+			return
+		}
 		baseConstructorType := c.getBaseConstructorTypeOfClass(classType)
 		if baseConstructorType.flags&(TypeFlagsObject|TypeFlagsIntersection|TypeFlagsTypeVariable) != 0 {
 			members = maps.Clone(members)
@@ -30598,6 +30864,15 @@ func (c *Checker) getLegacyDecoratorCallSignature(decorator *ast.Node) *Signatur
 				links.decoratorSignature = c.newCallSignature(nil, nil, []*ast.Symbol{targetParam, keyParam, descriptorParam}, c.getUnionType([]*Type{returnType, c.voidType}))
 			} else {
 				links.decoratorSignature = c.newCallSignature(nil, nil, []*ast.Symbol{targetParam, keyParam}, c.getUnionType([]*Type{returnType, c.voidType}))
+			}
+		case ast.KindFunctionDeclaration:
+			if ast.IsEtsFunctionDecorator(decorator, c.compilerOptions.Ets) {
+				symbol := c.getSymbolAtLocation(decorator.Expression(), false /*ignoreErrors*/)
+				if symbol != nil {
+					targetType := c.getTypeOfSymbol(symbol)
+					targetParam := c.newParameter("target", targetType)
+					links.decoratorSignature = c.newCallSignature(nil, nil, []*ast.Symbol{targetParam}, c.getUnionType([]*Type{targetType, c.voidType}))
+				}
 			}
 		}
 	}

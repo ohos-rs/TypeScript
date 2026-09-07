@@ -502,6 +502,10 @@ func (r *typeRenderer) namedType(named *types.Named) string {
 		return "unknown"
 	case "github.com/microsoft/TypeScript/tsc/internal/core.Tristate":
 		return "boolean"
+	case "github.com/microsoft/TypeScript/tsc/internal/core.EtsList":
+		return arrayElement(r.typeString(named.TypeArgs().At(0), false)) + "[]"
+	case "github.com/microsoft/TypeScript/tsc/internal/core.EtsValue":
+		return r.typeString(named.TypeArgs().At(0), false)
 	case "github.com/microsoft/TypeScript/tsc/internal/core.JsxEmit":
 		return r.importType("JsxEmit", "#enums/jsxEmit")
 	case "github.com/microsoft/TypeScript/tsc/internal/core.ModuleDetectionKind":

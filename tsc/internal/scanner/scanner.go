@@ -2535,6 +2535,9 @@ func GetTokenPosOfNode(node *ast.Node, sourceFile *ast.SourceFile, includeJSDoc 
 	if includeJSDoc && len(node.JSDoc(sourceFile)) > 0 {
 		return GetTokenPosOfNode(node.JSDoc(sourceFile)[0], sourceFile, false /*includeJSDoc*/)
 	}
+	if node.Virtual {
+		return node.Pos()
+	}
 	return SkipTriviaEx(sourceFile.Text(), node.Pos(), &SkipTriviaOptions{InJSDoc: node.Flags&ast.NodeFlagsJSDoc != 0})
 }
 
@@ -2646,7 +2649,7 @@ func GetErrorRangeForNode(sourceFile *ast.SourceFile, node *ast.Node) core.TextR
 		return GetRangeOfTokenAtPosition(sourceFile, node.Pos())
 	}
 	pos := errorNode.Pos()
-	if !ast.NodeIsMissing(errorNode) && !ast.IsJsxText(errorNode) {
+	if !ast.NodeIsMissing(errorNode) && !ast.IsJsxText(errorNode) && !node.Virtual {
 		pos = SkipTrivia(sourceFile.Text(), pos)
 	}
 	return core.NewTextRange(pos, errorNode.End())

@@ -1,6 +1,7 @@
 package compiler_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/bundled"
 	"github.com/microsoft/TypeScript/tsc/internal/compiler"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
+	"github.com/microsoft/TypeScript/tsc/internal/testutil/etstest"
 	"github.com/microsoft/TypeScript/tsc/internal/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfstest"
 )
@@ -28,21 +30,32 @@ func TestArkUIProgram(t *testing.T) {
 		{"common attributes", `Card().width(100)`, false},
 		{"state styles", `Text("hi").stateStyles({ normal: { .fontSize(20) } })`, false},
 		{"state styles type error", `Text("hi").stateStyles({ normal: { .fontSize("bad") } })`, true},
-		{"binding", `Card({ title: $message }); Text($$this.message); Text($r("app.string.title"))`, false},
+		// ets2bundle collects props and filters name diagnostics in its build
+		// host; OH TypeScript does not invent dollar-prefixed member aliases.
+		{"dollar identifiers need declarations", `Card({ title: $message }); Text($$this.message)`, true},
+		{"declared dollar identifier", `Text($r("app.string.title"))`, false},
 		{"unknown binding", `Text($missing)`, true},
 		{"generic component", `Box<string>({ value: "hello" })`, false},
 		{"generic component error", `Box<string>({ value: 42 })`, true},
-		{"required property missing", `Box<string>()`, true},
+		// OH parseStructMembers makes all properties optional; the build
+		// transform, not the TypeScript signature, enforces @Require.
+		{"require is checked by build transform", `Box<string>()`, false},
+		{"local storage parameter", `Card({ title: "hello" }, new LocalStorage())`, false},
+		{"local storage type", `Card({}, 1)`, true},
+		{"empty struct storage", `Empty(new LocalStorage())`, false},
+		{"empty struct has no property bag", `Empty({}, new LocalStorage())`, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
 				"/tsconfig.json": `{"compilerOptions":{"noEmit":true,"lib":["es2020"],"strict":true,"module":"esnext","moduleResolution":"bundler","allowImportingTsExtensions":true},"include":["**/*"]}`,
-				"/sdk.d.ets":     `declare class CommonAttribute { width(value: number): this; } declare class TextAttribute extends CommonAttribute { fontSize(value: number): this; stateStyles(styles: { normal?: TextAttribute }): this; } declare function Text(value: string): TextAttribute; declare function Column(): CommonAttribute; declare function $r(name: string): string;`,
-				"/Card.ets":      `@Component export struct Box<T> { @Require @Prop value: T; build() {} } @Component export struct Card { @Prop title: string; build() { Text(this.title) } }`,
-				"/Page.ets":      `import { Card, Box } from "./Card"; @Styles function common() { .width(100) } @Extend(Text) function emphasis(size: number) { .fontSize(size) } @Entry @Component struct Page { @State message: string = "hello"; build() { ` + tc.expression + ` } }`,
+				// Narrow declarations matching SDK common.d.ts/text.d.ts identities;
+				// virtual receivers and CustomComponent are real SDK declarations.
+				"/sdk.d.ets": `declare class LocalStorage { private storageBrand: never; } declare class CommonAttribute { width(value: number): this; } declare class CustomComponent extends CommonAttribute {} declare class TextAttribute extends CommonAttribute { fontSize(value: number): this; stateStyles(styles: { normal?: object }): this; } declare const CommonInstance: CommonAttribute; declare const TextInstance: TextAttribute; declare function Text(value: string): TextAttribute; declare function Column(): CommonAttribute; declare function $r(name: string): string; declare const Component: ClassDecorator, Entry: ClassDecorator; declare const Require: PropertyDecorator, Prop: PropertyDecorator, State: PropertyDecorator; declare const Styles: MethodDecorator;`,
+				"/Card.ets":  `@Component export struct Box<T> { @Require @Prop value!: T; build() {} } @Component export struct Card { @Prop title: string = ""; build() { Text(this.title) } }`,
+				"/Page.ets":  `import { Card, Box } from "./Card"; struct Empty { build() {} } @Styles function common() { .width(100) } @Extend(Text) function emphasis(size: number) { .fontSize(size) } @Entry @Component struct Page { @State message: string = "hello"; build() { ` + tc.expression + ` } }`,
 			}, true))
 			host := compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil)
-			config, errors := tsoptions.GetParsedCommandLineOfConfigFile("/tsconfig.json", &core.CompilerOptions{}, nil, host, nil)
+			config, errors := tsoptions.GetParsedCommandLineOfConfigFile("/tsconfig.json", &core.CompilerOptions{Ets: etstest.Options(), ExperimentalDecorators: core.TSTrue}, nil, host, nil)
 			if len(errors) != 0 {
 				t.Fatalf("config errors: %v", errors)
 			}
@@ -71,6 +84,111 @@ func TestArkUIProgram(t *testing.T) {
 				t.Fatal("struct symbol missing")
 			}
 		})
+	}
+}
+
+func TestArkUISourceOwnedDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/loader/declarations/badge.d.ets": `declare class LocalStorage {} declare class CustomComponent {} declare function Badge(value: string): void;`,
+		"/input.ets": `
+			struct Column { build() {} }
+			struct { build() {} }
+			function invalidPlace() { Badge("outside") }
+			struct Page { build() { Badge("inside") } }
+		`,
+	}, true))
+	options := &core.CompilerOptions{
+		NoEmit:                 core.TSTrue,
+		Module:                 core.ModuleKindESNext,
+		ModuleResolution:       core.ModuleResolutionKindBundler,
+		ExperimentalDecorators: core.TSTrue,
+		EtsAnnotationsEnable:   core.TSTrue,
+		EtsLoaderPath:          "/loader",
+		Ets:                    etstest.Options(),
+	}
+	program := compiler.NewProgram(compiler.ProgramOptions{
+		Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+			FileNames:       []string{"/loader/declarations/badge.d.ets", "/input.ets"},
+			CompilerOptions: options,
+		}},
+		Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+	})
+	diagnostics := program.GetSemanticDiagnostics(t.Context(), nil)
+	codes := make([]int32, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		codes = append(codes, diagnostic.Code())
+	}
+	for _, code := range []int32{28002, 28006, 28015} {
+		if !slices.Contains(codes, code) {
+			t.Errorf("missing TS%d in diagnostics %v", code, diagnostics)
+		}
+	}
+}
+
+func TestArkUIOhExportsDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/repo/entry.ets":                       `import { hidden } from "pkg"; hidden();`,
+		"/repo/oh_modules/pkg/oh-package.json5": `{name:'pkg',version:'1.0.0',types:'hidden.d.ets'}`,
+		"/repo/oh_modules/pkg/hidden.d.ets":     `export declare function hidden(): void;`,
+	}, true))
+	options := &core.CompilerOptions{
+		NoEmit:               core.TSTrue,
+		Module:               core.ModuleKindESNext,
+		ModuleResolution:     core.ModuleResolutionKindBundler,
+		EtsAnnotationsEnable: core.TSTrue,
+		PackageManagerType:   "ohpm",
+		OhPackageExports:     map[string][]string{"pkg": {"/repo/oh_modules/pkg/public.d.ets"}},
+	}
+	program := compiler.NewProgram(compiler.ProgramOptions{
+		Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+			FileNames:       []string{"/repo/entry.ets"},
+			CompilerOptions: options,
+		}},
+		Host: compiler.NewCompilerHost("/repo", fs, bundled.LibPath(), nil, nil, nil),
+	})
+	diagnostics := program.GetSemanticDiagnostics(t.Context(), nil)
+	if !slices.ContainsFunc(diagnostics, func(diagnostic *ast.Diagnostic) bool { return diagnostic.Code() == 28045 }) {
+		t.Fatalf("missing TS28045: %v", diagnostics)
+	}
+	if program.GetSourceFile("/repo/oh_modules/pkg/hidden.d.ets") != nil {
+		t.Fatal("non-oh-export dependency was materialized into the program")
+	}
+}
+
+func TestArkUIConfiguredFunctionDecoratorSkipsOrdinaryDecoratorSignature(t *testing.T) {
+	t.Parallel()
+
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/input.ets": `declare const Builder: number; @Builder function content() {}`,
+	}, true))
+	options := &core.CompilerOptions{
+		NoEmit:                 core.TSTrue,
+		Module:                 core.ModuleKindESNext,
+		ModuleResolution:       core.ModuleResolutionKindBundler,
+		ExperimentalDecorators: core.TSTrue,
+		EtsAnnotationsEnable:   core.TSTrue,
+		Ets:                    etstest.Options(),
+	}
+	program := compiler.NewProgram(compiler.ProgramOptions{
+		Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+			FileNames:       []string{"/input.ets"},
+			CompilerOptions: options,
+		}},
+		Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+	})
+	input := program.GetSourceFile("/input.ets")
+	if input == nil || !slices.ContainsFunc(input.Statements.Nodes, func(node *ast.Node) bool {
+		return ast.IsFunctionDeclaration(node) && ast.HasDecorators(node)
+	}) {
+		t.Fatalf("configured ETS function decorator was not preserved in AST: %#v", input)
+	}
+	diagnostics := program.GetSemanticDiagnostics(t.Context(), nil)
+	if slices.ContainsFunc(diagnostics, func(diagnostic *ast.Diagnostic) bool { return diagnostic.Code() == 28004 }) {
+		t.Fatalf("configured ArkTS function decorator used ordinary decorator checking: %v", diagnostics)
 	}
 }
 

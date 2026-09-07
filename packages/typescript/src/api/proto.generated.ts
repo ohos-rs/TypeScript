@@ -45,6 +45,7 @@ export interface APIMethodInfo {
     getSourceFile: APIMethod<GetSourceFileParams, SourceFileResponse | null>;
     getSourceFileNames: APIMethod<GetSourceFileNamesParams, string[]>;
     getSourceFileMetadata: APIMethod<GetSourceFileParams, SourceFileMetadata | null>;
+    getProgramSourceGraph: APIMethod<GetSourceFileNamesParams, ProgramSourceGraph>;
     getConfigFileNames: APIMethod<GetProjectDiagnosticsParams, string[] | null>;
     getConfigSourceFile: APIMethod<GetSourceFileParams, SourceFileResponse | null>;
     resolveName: APIMethod<ResolveNameParams, SymbolResponse | null>;
@@ -112,6 +113,7 @@ export interface APIMethodInfo {
     getTrueTypeOfConditionalType: APIMethod<GetTypePropertyParams, TypeResponse>;
     getFalseTypeOfConditionalType: APIMethod<GetTypePropertyParams, TypeResponse>;
     getConstantValue: APIMethod<CheckerNodeParams, unknown | null>;
+    getAnnotationInfo: APIMethod<CheckerNodeParams, AnnotationInfoResponse | null>;
     getSignatureFromDeclaration: APIMethod<CheckerNodeParams, SignatureResponse>;
     getExportSpecifierLocalTargetSymbol: APIMethod<CheckerNodeParams, SymbolResponse | null>;
     getAliasedSymbol: APIMethod<CheckerSymbolParams, SymbolResponse>;
@@ -131,6 +133,7 @@ export interface APIMethodInfo {
     getSyntacticDiagnostics: APIMethod<GetDiagnosticsParams, DiagnosticResponse[] | null>;
     getBindDiagnostics: APIMethod<GetDiagnosticsParams, DiagnosticResponse[] | null>;
     getSemanticDiagnostics: APIMethod<GetDiagnosticsParams, DiagnosticResponse[] | null>;
+    getArkTSLinterDiagnostics: APIMethod<GetDiagnosticsParams, DiagnosticResponse[] | null>;
     getSuggestionDiagnostics: APIMethod<GetDiagnosticsParams, DiagnosticResponse[] | null>;
     getDeclarationDiagnostics: APIMethod<GetDiagnosticsParams, DiagnosticResponse[] | null>;
     getProgramDiagnostics: APIMethod<GetProjectDiagnosticsParams, DiagnosticResponse[] | null>;
@@ -464,6 +467,15 @@ export interface SourceFileMetadata {
     impliedNodeFormat: ModuleKind;
 }
 
+/**
+ * ProgramSourceGraph carries compiler-owned module resolution facts. Build
+ * hosts consume these facts without reimplementing TypeScript resolution.
+ */
+export interface ProgramSourceGraph {
+    files: ProgramSourceGraphFile[] | null;
+    typeReferenceFiles: string[] | null;
+}
+
 /** GetProjectDiagnosticsParams are parameters for project-wide diagnostic methods. */
 export interface GetProjectDiagnosticsParams {
     snapshot: number;
@@ -709,6 +721,12 @@ export interface CheckerNodeParams {
     location: string;
 }
 
+export interface AnnotationInfoResponse {
+    declaration: string;
+    sourceRetention: boolean;
+    properties: AnnotationPropertyResponse[] | null;
+}
+
 /** CheckerSymbolParams are parameters for checker methods that operate on a symbol. */
 export interface CheckerSymbolParams {
     snapshot: number;
@@ -913,9 +931,11 @@ export interface BatchRequest {
         | "getAliasSymbolOfType"
         | "getAliasTypeArgumentsOfType"
         | "getAliasedSymbol"
+        | "getAnnotationInfo"
         | "getAnyType"
         | "getApparentPropertiesOfType"
         | "getApparentType"
+        | "getArkTSLinterDiagnostics"
         | "getBaseConstraintOfType"
         | "getBaseTypeOfLiteralType"
         | "getBaseTypeOfType"
@@ -969,6 +989,7 @@ export interface BatchRequest {
         | "getParametersOfSignature"
         | "getParentOfSymbol"
         | "getProgramDiagnostics"
+        | "getProgramSourceGraph"
         | "getPropertiesOfType"
         | "getPropertyOfType"
         | "getReducedType"
@@ -1060,9 +1081,11 @@ export interface BatchResponse {
         | "getAliasSymbolOfType"
         | "getAliasTypeArgumentsOfType"
         | "getAliasedSymbol"
+        | "getAnnotationInfo"
         | "getAnyType"
         | "getApparentPropertiesOfType"
         | "getApparentType"
+        | "getArkTSLinterDiagnostics"
         | "getBaseConstraintOfType"
         | "getBaseTypeOfLiteralType"
         | "getBaseTypeOfType"
@@ -1116,6 +1139,7 @@ export interface BatchResponse {
         | "getParametersOfSignature"
         | "getParentOfSymbol"
         | "getProgramDiagnostics"
+        | "getProgramSourceGraph"
         | "getPropertiesOfType"
         | "getPropertyOfType"
         | "getReducedType"
@@ -1241,6 +1265,73 @@ export interface CreateProgramOldProgramParams {
 
 /** CompilerOptions contains the compiler options exposed by the API. */
 export interface CompilerOptions {
+    /** OH compiler host options, supplied by the build service (not CLI flags). */
+    isCompileJsHar?: boolean;
+    moduleRootPath?: string;
+    maxFlowDepth?: number;
+    /** OH exposes this option in commandLineParser.ts as well as the host API. */
+    etsAnnotationsEnable?: boolean;
+    ets?: EtsOptions;
+    compileSdkVersion?: number;
+    etsLoaderPath?: string;
+    tsImportSoCheck?: boolean;
+    needDoArkTsLinter?: boolean;
+    isCompatibleVersion?: boolean;
+    tsImportSendableEnable?: boolean;
+    /**
+     * OH ets_checker.ts::setCompilerOptions and moduleNameResolver.ts. These
+     * values affect the checked source graph and must participate in compiler
+     * option identity rather than being reconstructed by an external caller.
+     */
+    packageManagerType?: string;
+    emitNodeModulesFiles?: boolean;
+    skipTscOhModuleCheck?: boolean;
+    skipArkTSStaticBlocksCheck?: boolean;
+    skipPathsInKeyForCompilationSettings?: boolean;
+    skipBaseUrlInKeyForCompilationSettings?: boolean;
+    compatibleSdkVersion?: number;
+    compatibleSdkVersionStage?: string;
+    skipOhModulesLint?: boolean;
+    enableStrictCheckOHModule?: boolean;
+    disableStrictCheckPaths?: string[];
+    disableSendableCheckRules?: string[];
+    mixCompile?: boolean;
+    strictCheckerOnly?: boolean;
+    /**
+     * The original compiler host supplies these already-resolved build inputs.
+     * Keeping them typed lets the Go resolver reproduce resolveModuleNames
+     * without invoking the JavaScript host.
+     */
+    ohSdkConfigs?: OhSdkConfig[];
+    ohSystemModules?: string[];
+    ohSdkConfigPrefixes?: string[];
+    ohFallbackModuleRoots?: string[];
+    ohLoaderModuleRoot?: string;
+    ohProjectPath?: string;
+    ohExternalApiPaths?: string[];
+    ohPackageExports?: Record<string, string[] | null>;
+    /**
+     * ets_checker.ts installs SDK validation callbacks closed over these
+     * projectConfig values. The native checker owns the same behavior directly,
+     * so the callback inputs are explicit immutable compiler state.
+     */
+    ohRuntimeOS?: string;
+    ohOriginCompatibleSdkVersion?: string;
+    ohProjectRootPath?: string;
+    ohModulePath?: string;
+    ohAllModulePaths?: string[];
+    ohGlobalModulePaths?: string[];
+    ohArkUIDeclarationDirs?: string[];
+    ohRequestPermissions?: string[];
+    ohSyscapIntersection?: string[];
+    ohSyscapUnion?: string[];
+    ohDeviceTypes?: string[];
+    ohCardEntryFiles?: string[];
+    ohCrossplatform?: boolean;
+    ohIgnoreCrossplatformCheck?: boolean;
+    ohCompileMode?: string;
+    ohBundleType?: string;
+    ohApiCompatibilityCheck?: string;
     allowJs?: boolean;
     allowArbitraryExtensions?: boolean;
     allowImportingTsExtensions?: boolean;
@@ -1367,10 +1458,27 @@ export interface TranspileOptions {
     reportDiagnostics?: boolean;
 }
 
+export interface ProgramSourceGraphFile {
+    fileName: string;
+    dependencies: string[] | null;
+}
+
 export interface ImportAdderAction {
     kind: "importSymbol";
     symbol?: number;
     isValidTypeOnlyUseSite?: boolean;
+}
+
+export interface AnnotationPropertyResponse {
+    name: string;
+    declaration: string;
+    type: TypeResponse | null;
+    initializer: AnnotationConstantResponse | null;
+    argument: AnnotationConstantResponse | null;
+    arrayDepth: number;
+    elementType: TypeResponse | null;
+    enumDeclaration?: string;
+    enumFirstValue: AnnotationConstantResponse | null;
 }
 
 /** CompletionEntryResponse represents a single completion item. */
@@ -1409,8 +1517,85 @@ export interface ProjectFileChanges {
     deletedFiles?: string[];
 }
 
+/**
+ * OH types.ts::EtsOptions. Preserve table order: Extend chooses the last
+ * decorator and attribute callbacks use the first matching component record.
+ */
+export interface EtsOptions {
+    render?: EtsRenderOptions;
+    components?: string[];
+    libs?: string[];
+    extend?: EtsExtendOptions;
+    styles?: EtsStylesOptions;
+    concurrent?: EtsConcurrentOptions;
+    customComponent?: string;
+    propertyDecorators?: EtsPropertyDecorator[];
+    emitDecorators?: EtsEmitDecorator[];
+    syntaxComponents?: EtsSyntaxComponents;
+}
+
+export interface OhSdkConfig {
+    apiPaths?: string[];
+}
+
+/**
+ * Scalar text is tagged so JSON cannot erase -0 or reject NaN/Infinity.
+ * Nil represents no evaluated constant; an empty array is kind=array/items=[].
+ */
+export interface AnnotationConstantResponse {
+    kind: string;
+    value: string;
+    items?: AnnotationConstantResponse[];
+}
+
 /** CompletionEntryLabelDetailsResponse holds additional label display text for a completion entry. */
 export interface CompletionEntryLabelDetailsResponse {
     detail?: string;
     description?: string;
+}
+
+export interface EtsRenderOptions {
+    method?: string[];
+    decorator?: string[];
+}
+
+export interface EtsExtendOptions {
+    decorator?: string[];
+    components?: EtsComponentDeclaration[];
+}
+
+export interface EtsStylesOptions {
+    decorator?: string;
+    component?: EtsComponentDeclaration;
+    property?: string;
+}
+
+export interface EtsConcurrentOptions {
+    decorator?: string;
+}
+
+export interface EtsPropertyDecorator {
+    name: string;
+    needInitialization: boolean;
+}
+
+export interface EtsEmitDecorator {
+    name: string;
+    emitParameters: boolean;
+}
+
+export interface EtsSyntaxComponents {
+    paramsUICallback?: string[];
+    attrUICallback?: EtsAttributeCallback[];
+}
+
+export interface EtsComponentDeclaration {
+    name: string;
+    type: string;
+    instance: string;
+}
+
+export interface EtsAttributeCallback {
+    name: string;
+    attributes?: string[];
 }

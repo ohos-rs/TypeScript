@@ -115,8 +115,13 @@ func (c *Checker) getFlowTypeOfReferenceEx(reference *ast.Node, declaredType *Ty
 }
 
 func (c *Checker) getTypeAtFlowNode(f *FlowState, flow *ast.FlowNode) FlowType {
-	if f.depth == 2000 {
-		// We have made 2000 recursive invocations. To avoid overflowing the call stack we report an error
+	// OH ohApi.ts::getMaxFlowDepth defaults a missing/zero option to 2000.
+	maxFlowDepth := c.compilerOptions.MaxFlowDepth
+	if maxFlowDepth == 0 {
+		maxFlowDepth = 2000
+	}
+	if float64(f.depth) == maxFlowDepth {
+		// We reached the configured recursive invocation limit. To avoid overflowing the call stack we report an error
 		// and disable further control flow analysis in the containing function or module body.
 		if tr := c.tracer; tr != nil {
 			tr.Instant(tracing.PhaseCheckTypes, "getTypeAtFlowNode_DepthLimit", map[string]any{"depth": f.depth})

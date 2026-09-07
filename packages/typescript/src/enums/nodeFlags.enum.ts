@@ -33,7 +33,6 @@ export enum NodeFlags {
     ReparserTransformedLiteral = 1 << 28,
     Struct = 1 << 29,
     EtsComponent = 1 << 30,
-    EtsImplicitReceiver = 1 << 31,
     BlockScoped = Let | Const | Using,
     Constant = Const | Using,
     AwaitUsing = Const | Using,
@@ -44,7 +43,6 @@ export enum NodeFlags {
     PermanentlySetIncrementalFlags = PossiblyContainsDynamicImport | PossiblyContainsImportMeta,
     IdentifierHasExtendedUnicodeEscape = ContainsThis,
     IdentifierIsInJSDocNamespace = HasAsyncFunctions,
-    EtsBinding = Struct,
-    EtsStylesBlock = Struct,
+    Annotation = EtsComponent,
     NestedNamespace = OptionalChain,
 }

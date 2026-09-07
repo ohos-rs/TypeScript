@@ -50,6 +50,12 @@ func newEmitResolver(checker *Checker) *EmitResolver {
 	return e
 }
 
+func (r *EmitResolver) IsEtsAnnotation(node *ast.Node) bool {
+	r.checkerMu.Lock()
+	defer r.checkerMu.Unlock()
+	return ast.IsDecorator(node) && r.checker.annotationForDecorator(node) != nil
+}
+
 func (r *EmitResolver) GetJsxFactoryEntity(location *ast.Node) *ast.Node {
 	r.checkerMu.Lock()
 	defer r.checkerMu.Unlock()

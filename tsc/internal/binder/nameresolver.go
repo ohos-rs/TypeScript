@@ -13,7 +13,7 @@ type NameResolver struct {
 	Globals                          ast.SymbolTable
 	ArgumentsSymbol                  *ast.Symbol
 	RequireSymbol                    *ast.Symbol
-	Lookup                           func(symbols ast.SymbolTable, name string, meaning ast.SymbolFlags) *ast.Symbol
+	Lookup                           func(symbols ast.SymbolTable, name string, meaning ast.SymbolFlags, location ...*ast.Node) *ast.Symbol
 	SymbolReferenced                 func(symbol *ast.Symbol, meaning ast.SymbolFlags)
 	SetRequiresScopeChangeCache      func(node *ast.Node, value core.Tristate)
 	GetRequiresScopeChangeCache      func(node *ast.Node) core.Tristate
@@ -325,7 +325,7 @@ loop:
 		}
 	}
 	if result == nil && !excludeGlobals {
-		result = r.lookup(r.Globals, name, meaning|ast.SymbolFlagsGlobalLookup)
+		result = r.lookup(r.Globals, name, meaning|ast.SymbolFlagsGlobalLookup, originalLocation)
 	}
 	if result == nil {
 		if originalLocation != nil && ast.IsInJSFile(originalLocation) && originalLocation.Parent != nil {
@@ -423,9 +423,9 @@ func (r *NameResolver) getSymbolOfDeclaration(node *ast.Node) *ast.Symbol {
 	return node.Symbol()
 }
 
-func (r *NameResolver) lookup(symbols ast.SymbolTable, name string, meaning ast.SymbolFlags) *ast.Symbol {
+func (r *NameResolver) lookup(symbols ast.SymbolTable, name string, meaning ast.SymbolFlags, location ...*ast.Node) *ast.Symbol {
 	if r.Lookup != nil {
-		return r.Lookup(symbols, name, meaning)
+		return r.Lookup(symbols, name, meaning, location...)
 	}
 	// Default implementation does not support following aliases or merged symbols
 	if meaning != 0 {

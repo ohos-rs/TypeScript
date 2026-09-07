@@ -4,11 +4,13 @@ go 1.26
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
+	github.com/dlclark/regexp2/v2 v2.7.2
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
 	github.com/google/go-cmp v0.7.0
 	github.com/klauspost/compress v1.19.0
 	github.com/mackerelio/go-osstat v0.2.7
 	github.com/peter-evans/patience v0.3.0
+	github.com/titanous/json5 v1.0.0
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/sync v0.21.0
 	golang.org/x/sys v0.46.0

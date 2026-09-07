@@ -77,7 +77,13 @@ func GetTextOfNodeFromSourceText(sourceText string, node *ast.Node, includeTrivi
 	if !includeTrivia {
 		pos = SkipTrivia(sourceText, pos)
 	}
-	text := sourceText[pos:node.End()]
+	end := node.End()
+	// OH getTextOfNodeFromSourceText uses String.substring, which swaps
+	// bounds for a virtual zero-width node whose trivia advances past end.
+	if node.Virtual && pos > end {
+		pos, end = end, pos
+	}
+	text := sourceText[pos:end]
 	if isJSDocTypeExpressionOrChild(node) {
 		text = normalizeJSDocTypeSourceText(text)
 	}
@@ -120,6 +126,9 @@ func GetTextOfJSDocComment(comment *ast.NodeList) string {
 }
 
 func DeclarationNameToString(name *ast.Node) string {
+	if name != nil && name.Virtual && ast.IsIdentifier(name) {
+		return name.Text()
+	}
 	if name == nil || name.Pos() == name.End() {
 		return "(Missing)"
 	}

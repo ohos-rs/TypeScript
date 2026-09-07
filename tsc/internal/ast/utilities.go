@@ -64,7 +64,7 @@ func GetLocals(container *Node) SymbolTable {
 
 // Determines if a node is missing (either `nil` or empty)
 func NodeIsMissing(node *Node) bool {
-	return node == nil || node.Loc.Pos() == node.Loc.End() && node.Loc.Pos() >= 0 && node.Kind != KindEndOfFile
+	return node == nil || !node.Virtual && node.Loc.Pos() == node.Loc.End() && node.Loc.Pos() >= 0 && node.Kind != KindEndOfFile
 }
 
 // Determines if a node is present

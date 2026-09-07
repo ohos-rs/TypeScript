@@ -20,12 +20,14 @@ import {
 } from "./node.generated.ts";
 import {
     NODE_EXTENDED_DATA_MASK,
+    readEtsOptionsJson,
     type SourceFileInfo,
     type TextDecoder,
 } from "./node.infrastructure.ts";
 import {
     HEADER_OFFSET_EXTENDED_DATA,
     HEADER_OFFSET_NODES,
+    HEADER_OFFSET_PARSE_OPTIONS,
     HEADER_OFFSET_STRING_TABLE,
     HEADER_OFFSET_STRING_TABLE_OFFSETS,
     HEADER_OFFSET_STRUCTURED_DATA,
@@ -35,6 +37,7 @@ import {
     NODE_OFFSET_PARENT,
 } from "./protocol.ts";
 import { Wtf8Decoder } from "./wtf8.ts";
+import type { SourceFile } from "../../ast/ast.ts";
 
 // Re-export everything consumers need from the other two files.
 export { RemoteNode, RemoteNodeList } from "./node.generated.ts";
@@ -75,6 +78,7 @@ for (const [index, offset] of Object.values(sourceFileExtendedDataOffsets).entri
 const NO_STRUCTURED_DATA = 0xFFFFFFFF;
 
 export class RemoteSourceFile extends RemoteNode implements SourceFileInfo {
+    readonly parseOptions: NonNullable<SourceFile["parseOptions"]>;
     readonly nodes: (RemoteNode | RemoteNodeList)[];
     readonly _offsetNodes: number;
     readonly _offsetStringTableOffsets: number;
@@ -101,6 +105,10 @@ export class RemoteSourceFile extends RemoteNode implements SourceFileInfo {
         const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
         const offsetNodes = view.getUint32(HEADER_OFFSET_NODES, true);
         super(view, 1, undefined!, undefined!, offsetNodes);
+        this.parseOptions = {
+            flags: view.getUint32(HEADER_OFFSET_PARSE_OPTIONS, true),
+            ets: JSON.parse(readEtsOptionsJson(view)),
+        };
         this._sourceFile = this;
         this._offsetNodes = offsetNodes;
         this._offsetStringTableOffsets = view.getUint32(HEADER_OFFSET_STRING_TABLE_OFFSETS, true);

@@ -3,10 +3,11 @@ package parser_test
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/internal/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
 	"github.com/microsoft/TypeScript/tsc/internal/parser"
-	"github.com/microsoft/TypeScript/tsc/internal/printer"
+	"github.com/microsoft/TypeScript/tsc/internal/testutil/etstest"
 )
 
 func TestArkUI(t *testing.T) {
@@ -32,15 +33,19 @@ func TestArkUI(t *testing.T) {
 		`struct Page { build() { Text($$this.message).stateStyles({ normal: { .fontSize(20).width(100) } }) } }`,
 	} {
 		t.Run(source, func(t *testing.T) {
-			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/page.ets", Path: "/page.ets"}, source, core.ScriptKindETS)
+			file := parser.ParseSourceFile(ast.SourceFileParseOptions{Ets: etstest.Options(), FileName: "/page.ets", Path: "/page.ets"}, source, core.ScriptKindETS)
 			if len(file.Diagnostics()) != 0 {
 				t.Fatalf("parse diagnostics: %v", file.Diagnostics())
 			}
-			p := printer.NewPrinter(printer.PrinterOptions{NewLine: core.NewLineKindLF}, printer.PrintHandlers{}, nil)
-			text := p.EmitSourceFile(file)
-			reparsed := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/page.ets", Path: "/page.ets"}, text, core.ScriptKindETS)
-			if len(reparsed.Diagnostics()) != 0 {
-				t.Fatalf("round trip diagnostics: %v\n%s", reparsed.Diagnostics(), text)
+			// Virtual constructor/signature nodes are checker input, not source
+			// text to reparse. Protect the actual AST service round trip.
+			data, _, err := encoder.EncodeSourceFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reparsed, err := encoder.DecodeSourceFile(data)
+			if err != nil {
+				t.Fatal(err)
 			}
 			counts := func(f *ast.SourceFile) [3]int {
 				var result [3]int
@@ -62,7 +67,7 @@ func TestArkUI(t *testing.T) {
 				return result
 			}
 			if counts(file) != counts(reparsed) {
-				t.Fatalf("AST lost on round trip: %v -> %v\n%s", counts(file), counts(reparsed), text)
+				t.Fatalf("AST lost on round trip: %v -> %v", counts(file), counts(reparsed))
 			}
 			factory := &ast.NodeFactory{}
 			clone := factory.DeepCloneReparse(file.AsNode()).AsSourceFile()
@@ -82,12 +87,12 @@ func TestArkUIContextIsolation(t *testing.T) {
 		`struct Page { build() { Text("hello").onClick(() => { Column() {}.width(100) }) } }`,
 		`struct Page { build() { function ordinary() { Column() {}.width(100) } } }`,
 	} {
-		file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/page.ets", Path: "/page.ets"}, source, core.ScriptKindETS)
+		file := parser.ParseSourceFile(ast.SourceFileParseOptions{Ets: etstest.Options(), FileName: "/page.ets", Path: "/page.ets"}, source, core.ScriptKindETS)
 		if len(file.Diagnostics()) == 0 {
 			t.Errorf("ArkUI leaked into ordinary function: %s", source)
 		}
 	}
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/page.ts", Path: "/page.ts"}, `struct Page { build() { Column() {} } }`, core.ScriptKindTS)
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{Ets: etstest.Options(), FileName: "/page.ts", Path: "/page.ts"}, `struct Page { build() { Column() {} } }`, core.ScriptKindTS)
 	if len(file.Diagnostics()) == 0 {
 		t.Error("TypeScript accepted struct syntax")
 	}

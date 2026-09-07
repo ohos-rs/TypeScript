@@ -215,6 +215,15 @@ func (c *Checker) checkGrammarModifiers(node *ast.Node /*Union[HasModifiers, Has
 	if node.Modifiers() == nil {
 		return false
 	}
+	// OH checkGrammarDecorators checks annotations attached to otherwise
+	// illegal decorator targets too (functions, interfaces, variables, etc.).
+	for _, modifier := range node.ModifierNodes() {
+		if ast.IsDecorator(modifier) {
+			if declaration := c.annotationForDecorator(modifier); declaration != nil {
+				c.checkAnnotationUse(modifier, declaration)
+			}
+		}
+	}
 	if c.reportObviousDecoratorErrors(node) || c.reportObviousModifierErrors(node) {
 		return true
 	}
@@ -239,7 +248,13 @@ func (c *Checker) checkGrammarModifiers(node *ast.Node /*Union[HasModifiers, Has
 	modifiers := node.ModifierNodes()
 	for _, modifier := range modifiers {
 		if ast.IsDecorator(modifier) {
-			if !ast.IsArkUICompilerDecorator(modifier) && !ast.NodeCanBeDecorated(c.legacyDecorators, node, node.Parent, node.Parent.Parent) {
+			if c.annotationForDecorator(modifier) != nil {
+				continue
+			}
+			etsGrammarTarget := ast.GetSourceFileOfNode(node).ScriptKind == core.ScriptKindETS && !ast.IsConstructorDeclaration(node) &&
+				(ast.IsEtsBuilder(node, c.compilerOptions.Ets) || ast.HasEtsStylesDecorator(node, c.compilerOptions.Ets))
+			etsFunction := ast.IsFunctionDeclaration(node) && ast.HasEtsDecorator(node, c.compilerOptions.Ets)
+			if !etsGrammarTarget && !etsFunction && !ast.IsSendableFunctionOrType(node) && !ast.NodeCanBeDecorated(c.legacyDecorators, node, node.Parent, node.Parent.Parent) {
 				if node.Kind == ast.KindMethodDeclaration && !ast.NodeIsPresent(node.Body()) {
 					return c.grammarErrorOnFirstToken(node, diagnostics.A_decorator_can_only_decorate_a_method_implementation_not_an_overload)
 				} else {
@@ -648,8 +663,10 @@ func (c *Checker) reportObviousDecoratorErrors(node *ast.Node) bool {
 }
 
 func (c *Checker) findFirstIllegalDecorator(node *ast.Node) *ast.Node {
-	if ast.CanHaveIllegalDecorators(node) {
-		decorator := core.Find(node.ModifierNodes(), func(n *ast.Node) bool { return ast.IsDecorator(n) && !ast.IsArkUICompilerDecorator(n) })
+	if ast.CanHaveIllegalDecorators(node) && !ast.HasEtsDecorator(node, c.compilerOptions.Ets) && !ast.IsSendableFunctionOrType(node) {
+		decorator := core.Find(node.ModifierNodes(), func(n *ast.Node) bool {
+			return ast.IsDecorator(n) && c.annotationForDecorator(n) == nil
+		})
 		return decorator
 	} else {
 		return nil

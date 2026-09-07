@@ -45,6 +45,7 @@ const (
 	PCImportOrExportSpecifiers                       // Named import clause's import specifier list
 	PCImportAttributes                               // Import attributes
 	PCJSDocComment                                   // Parsing via JSDocParser
+	PCAnnotationMembers                              // Members in ETS annotation declaration
 	PCCount                                          // Number of parsing contexts
 )
 
@@ -64,13 +65,18 @@ const (
 )
 
 type Parser struct {
-	arkUIStruct     bool
-	arkUI           bool
-	arkUIStyles     bool
-	arkUIExpression bool
-	arkUICallback   bool
-	scanner         *scanner.Scanner
-	factory         ast.NodeFactory
+	arkUIStruct           bool
+	arkUI                 bool
+	arkUIStyles           bool
+	arkUIExpression       bool
+	arkUICallback         bool
+	arkUIBuild            bool
+	arkUIStyleDeclaration *core.EtsComponentDeclaration
+	arkUIStyleGeneric     bool
+	arkUINew              bool
+	etsStateRoot          string
+	scanner               *scanner.Scanner
+	factory               ast.NodeFactory
 
 	opts       ast.SourceFileParseOptions
 	sourceText string
@@ -775,6 +781,8 @@ func (p *Parser) parsingContextErrors(context ParsingContext) {
 		p.parseErrorAtCurrentToken(diagnostics.Property_or_signature_expected)
 	case PCClassMembers:
 		p.parseErrorAtCurrentToken(diagnostics.Unexpected_token_A_constructor_method_accessor_or_property_was_expected)
+	case PCAnnotationMembers:
+		p.parseErrorAtCurrentToken(diagnostics.Unexpected_token_An_annotation_property_was_expected)
 	case PCEnumMembers:
 		p.parseErrorAtCurrentToken(diagnostics.Enum_member_expected)
 	case PCHeritageClauseElement:
@@ -840,6 +848,8 @@ func (p *Parser) isListElement(parsingContext ParsingContext, inErrorRecovery bo
 		return p.token == ast.KindCaseKeyword || p.token == ast.KindDefaultKeyword
 	case PCTypeMembers:
 		return p.lookAhead((*Parser).scanTypeMemberStart)
+	case PCAnnotationMembers:
+		return p.lookAhead((*Parser).scanAnnotationMemberStart)
 	case PCClassMembers:
 		// We allow semicolons as class elements (as specified by ES6) as long as we're
 		// not in error recovery.  If we're in error recovery, we don't want an errant
@@ -923,7 +933,7 @@ func (p *Parser) isListTerminator(kind ParsingContext) bool {
 		return true
 	}
 	switch kind {
-	case PCBlockStatements, PCSwitchClauses, PCTypeMembers, PCClassMembers, PCEnumMembers, PCObjectLiteralMembers,
+	case PCBlockStatements, PCSwitchClauses, PCTypeMembers, PCClassMembers, PCAnnotationMembers, PCEnumMembers, PCObjectLiteralMembers,
 		PCObjectBindingElements, PCImportOrExportSpecifiers, PCImportAttributes:
 		return p.token == ast.KindCloseBraceToken
 	case PCSwitchClauseStatements:
@@ -1012,6 +1022,10 @@ func (p *Parser) parseExpectedWithDiagnostic(kind ast.Kind, message *diagnostics
 		if shouldAdvance {
 			p.nextToken()
 		}
+		return true
+	}
+	// OH parseExpected permits implicit punctuation in stateStyles objects.
+	if p.etsStateRoot != "" && (p.arkUIBuild || p.arkUIStyles) {
 		return true
 	}
 	// Report specific message if provided with one.  Otherwise, report generic fallback message.
@@ -1157,6 +1171,9 @@ func (p *Parser) parseDeclaration() *ast.Statement {
 }
 
 func (p *Parser) parseDeclarationWorker(pos int, jsdoc jsdocScannerInfo, modifiers *ast.ModifierList) *ast.Statement {
+	if p.isAnnotationDeclaration() {
+		return p.parseAnnotationDeclaration(pos, jsdoc, modifiers)
+	}
 	if p.isStructDeclaration() {
 		return p.parseClassDeclaration(pos, jsdoc, modifiers)
 	}
@@ -1727,6 +1744,7 @@ func (p *Parser) parseTypeAnnotation() *ast.TypeNode {
 }
 
 func (p *Parser) parseFunctionDeclaration(pos int, jsdoc jsdocScannerInfo, modifiers *ast.ModifierList) *ast.Node {
+	defer p.enterEtsFunction(modifiers, "", false)()
 	p.parseExpected(ast.KindFunctionKeyword)
 	asteriskToken := p.parseOptionalToken(ast.KindAsteriskToken)
 	// We don't parse the name here in await context, instead we will report a grammar error in the checker.
@@ -1735,14 +1753,14 @@ func (p *Parser) parseFunctionDeclaration(pos int, jsdoc jsdocScannerInfo, modif
 		name = p.parseBindingIdentifier()
 	}
 	signatureFlags := core.IfElse(asteriskToken != nil, ParseFlagsYield, ParseFlagsNone) | core.IfElse(modifiers != nil && modifiers.ModifierFlags&ast.ModifierFlagsAsync != 0, ParseFlagsAwait, ParseFlagsNone)
-	typeParameters := p.parseTypeParameters()
+	typeParameters := p.parseEtsFunctionTypeParameters()
 	saveContextFlags := p.contextFlags
 	if modifiers != nil && modifiers.ModifierFlags&ast.ModifierFlagsExport != 0 {
 		p.setContextFlags(ast.NodeFlagsAwaitContext, true)
 	}
 	parameters := p.parseParameters(signatureFlags)
-	returnType := p.parseReturnType(ast.KindColonToken, false /*isType*/)
-	body := p.parseArkUIFunctionBody(signatureFlags, diagnostics.X_or_expected, modifiers, false)
+	returnType := p.parseEtsFunctionReturnType()
+	body := p.parseFunctionBlockOrSemicolon(signatureFlags, diagnostics.X_or_expected)
 	p.contextFlags = saveContextFlags
 	result := p.finishNode(p.factory.NewFunctionDeclaration(modifiers, asteriskToken, name, typeParameters, parameters, returnType, nil /*fullSignature*/, body), pos)
 	p.withJSDoc(result, jsdoc)
@@ -1780,11 +1798,19 @@ func (p *Parser) parseClassDeclarationOrExpression(pos int, jsdoc jsdocScannerIn
 		p.setContextFlags(ast.NodeFlagsAwaitContext, true /*value*/)
 	}
 	heritageClauses := p.parseHeritageClauses(false /*isInterface*/)
+	if isStruct && heritageClauses == nil {
+		if base := p.opts.Ets.CustomComponent.Or(""); base != "" {
+			heritageClauses = p.etsStructHeritage(base)
+		}
+	}
 	var members *ast.NodeList
 	if p.parseExpected(ast.KindOpenBraceToken) {
 		// ClassTail[Yield,Await] : (Modified) See 14.5
 		//      ClassHeritage[?Yield,?Await]opt { ClassBody[?Yield,?Await]opt }
 		members = p.parseList(PCClassMembers, (*Parser).parseClassElement)
+		if isStruct {
+			members = p.addEtsStructConstructor(members, pos)
+		}
 		p.parseExpected(ast.KindCloseBraceToken)
 	} else {
 		members = p.createMissingList()
@@ -1926,6 +1952,7 @@ func (p *Parser) parseClassElement() *ast.Node {
 		return result
 	}
 	modifiers := p.parseModifiersEx(true /*allowDecorators*/, true /*permitConstAsModifier*/, true /*stopOnStartOfClassStaticBlock*/)
+	modifiers = p.addArkUIReadonly(modifiers)
 	if p.token == ast.KindStaticKeyword && p.lookAhead((*Parser).nextTokenIsOpenBrace) {
 		return p.parseClassStaticBlockDeclaration(pos, jsdoc, modifiers)
 	}
@@ -2022,11 +2049,13 @@ func (p *Parser) parsePropertyOrMethodDeclaration(pos int, jsdoc jsdocScannerInf
 }
 
 func (p *Parser) parseMethodDeclaration(pos int, jsdoc jsdocScannerInfo, modifiers *ast.ModifierList, asteriskToken *ast.Node, name *ast.Node, questionToken *ast.Node, diagnosticMessage *diagnostics.Message) *ast.Node {
+	methodName, _ := ast.TryGetTextOfPropertyName(name)
+	defer p.enterEtsFunction(modifiers, methodName, true)()
 	signatureFlags := core.IfElse(asteriskToken != nil, ParseFlagsYield, ParseFlagsNone) | core.IfElse(modifierListHasAsync(modifiers), ParseFlagsAwait, ParseFlagsNone)
-	typeParameters := p.parseTypeParameters()
+	typeParameters := p.parseEtsFunctionTypeParameters()
 	parameters := p.parseParameters(signatureFlags)
-	typeNode := p.parseReturnType(ast.KindColonToken, false /*isType*/)
-	body := p.parseArkUIFunctionBody(signatureFlags, diagnosticMessage, modifiers, p.arkUIStruct && name.Kind == ast.KindIdentifier && name.Text() == "build")
+	typeNode := p.parseEtsFunctionReturnType()
+	body := p.parseFunctionBlockOrSemicolon(signatureFlags, diagnosticMessage)
 	result := p.finishNode(p.factory.NewMethodDeclaration(modifiers, asteriskToken, name, questionToken, typeParameters, parameters, typeNode, nil /*fullSignature*/, body), pos)
 	p.withJSDoc(result, jsdoc)
 	p.checkJSSyntax(result)
@@ -3257,7 +3286,9 @@ func (p *Parser) parseTypeMember() *ast.Node {
 	}
 	pos := p.nodePos()
 	jsdoc := p.jsdocScannerInfo()
-	modifiers := p.parseModifiers()
+	// OH parseTypeMember preserves annotations on interface members. Keep
+	// standard TypeScript parsing unchanged; only ETS accepts them here.
+	modifiers := p.parseModifiersEx(p.scriptKind == core.ScriptKindETS, false, false)
 	if p.parseContextualModifier(ast.KindGetKeyword) {
 		return p.parseAccessorDeclaration(pos, jsdoc, modifiers, ast.KindGetAccessor, ParseFlagsType)
 	}
@@ -3265,6 +3296,16 @@ func (p *Parser) parseTypeMember() *ast.Node {
 		return p.parseAccessorDeclaration(pos, jsdoc, modifiers, ast.KindSetAccessor, ParseFlagsType)
 	}
 	if p.isIndexSignature() {
+		// OH parseTypeMember discards decorators for index signatures, while
+		// retaining ordinary modifiers such as readonly.
+		if p.scriptKind == core.ScriptKindETS && modifiers != nil {
+			nodes := slices.DeleteFunc(modifiers.Nodes, ast.IsDecorator)
+			if len(nodes) == 0 {
+				modifiers = nil
+			} else {
+				modifiers = p.newModifierList(modifiers.Loc, nodes)
+			}
+		}
 		return p.parseIndexSignatureDeclaration(pos, jsdoc, modifiers)
 	}
 	return p.parsePropertyOrMethodSignature(pos, jsdoc, modifiers)
@@ -3304,9 +3345,18 @@ func (p *Parser) parseTypeParameters() *ast.NodeList {
 }
 
 func (p *Parser) parseTypeParameter() *ast.Node {
+	return p.parseTypeParameterWorker(false)
+}
+
+func (p *Parser) parseTypeParameterWorker(virtual bool) *ast.Node {
 	pos := p.nodePos()
 	modifiers := p.parseModifiersEx(false /*allowDecorators*/, true /*permitConstAsModifier*/, false /*stopOnStartOfClassStaticBlock*/)
-	name := p.parseIdentifier()
+	var name *ast.Node
+	if virtual {
+		name = p.etsVirtualIdentifier(p.arkUIStyleDeclaration.Type, pos)
+	} else {
+		name = p.parseIdentifier()
+	}
 	var constraint *ast.TypeNode
 	var expression *ast.Expression
 	if p.parseOptional(ast.KindExtendsKeyword) {
@@ -3332,7 +3382,12 @@ func (p *Parser) parseTypeParameter() *ast.Node {
 		defaultType = p.parseType()
 	}
 	result := p.factory.NewTypeParameterDeclaration(modifiers, name, constraint, expression, defaultType)
-	return p.finishNode(result, pos)
+	p.finishNode(result, pos)
+	if virtual {
+		result.Loc = core.NewTextRange(pos, pos)
+		result.Virtual = true
+	}
+	return result
 }
 
 func (p *Parser) parseParameters(flags ParseFlags) *ast.NodeList {
@@ -3946,7 +4001,7 @@ func (p *Parser) parseModifiersEx(allowDecorators bool, permitConstAsModifier bo
 	pos := p.nodePos()
 	list := make([]*ast.Node, 0, 16)
 	for {
-		if allowDecorators && p.token == ast.KindAtToken && !hasTrailingModifier {
+		if allowDecorators && p.token == ast.KindAtToken && !hasTrailingModifier && !p.isAnnotationDeclaration() {
 			decorator := p.parseDecorator()
 			list = append(list, decorator)
 			if hasLeadingModifier {
@@ -4112,6 +4167,9 @@ func (p *Parser) canFollowExportModifier() bool {
 }
 
 func (p *Parser) canFollowModifier() bool {
+	if p.isAnnotationDeclaration() {
+		return true
+	}
 	return p.token == ast.KindOpenBracketToken || p.token == ast.KindOpenBraceToken || p.token == ast.KindAsteriskToken || p.token == ast.KindDotDotDotToken || p.isLiteralPropertyName()
 }
 
@@ -4226,6 +4284,12 @@ func (p *Parser) parseAssignmentExpressionOrHigherWorker(allowReturnTypeInArrowF
 		return p.makeBinaryExpression(expr, p.parseTokenNode(), p.parseAssignmentExpressionOrHigherWorker(allowReturnTypeInArrowFunction), pos)
 	}
 	// It wasn't an assignment or a lambda.  This is a conditional expression:
+	if p.arkUIBuild && ast.IsCallExpression(expr) && !ast.IsEtsComponentExpression(expr) && p.token == ast.KindOpenBraceToken {
+		body := p.parseFunctionBlock(ParseFlagsNone, nil)
+		result := p.finishNode(p.factory.NewCallExpression(expr.Expression(), nil, nil, expr.AsCallExpression().Arguments, body, ast.NodeFlagsNone), pos)
+		result.Flags |= ast.NodeFlagsEtsComponent
+		return result
+	}
 	return p.parseConditionalExpressionRest(expr, pos, allowReturnTypeInArrowFunction)
 }
 
@@ -4542,9 +4606,10 @@ func typeHasArrowFunctionBlockingParseError(node *ast.TypeNode) bool {
 }
 
 func (p *Parser) parseArrowFunctionExpressionBody(isAsync bool, allowReturnTypeInArrowFunction bool) *ast.Node {
-	savedUI, savedStyles := p.arkUI, p.arkUIStyles
+	savedUI, savedStyles, savedBuild := p.arkUI, p.arkUIStyles, p.arkUIBuild
 	p.arkUI, p.arkUIStyles = p.arkUICallback, false
-	defer func() { p.arkUI, p.arkUIStyles = savedUI, savedStyles }()
+	p.arkUIBuild = p.arkUIBuild && p.arkUICallback
+	defer func() { p.arkUI, p.arkUIStyles, p.arkUIBuild = savedUI, savedStyles, savedBuild }()
 	if p.token == ast.KindOpenBraceToken {
 		return p.parseFunctionBlock(core.IfElse(isAsync, ParseFlagsAwait, ParseFlagsNone), nil /*diagnosticMessage*/)
 	}
@@ -5553,24 +5618,18 @@ func (p *Parser) parseCallExpressionRest(pos int, expression *ast.Expression) *a
 				expression = expression.AsExpressionWithTypeArguments().Expression
 			}
 			inner := expression
-			isComponent := p.arkUIExpression && questionDotToken == nil && isArkUIComponentName(expression)
 			savedExpression, savedCallback, savedStyles := p.arkUIExpression, p.arkUICallback, p.arkUIStyles
 			p.arkUIExpression = false
-			p.arkUICallback = p.arkUI && isArkUIIteration(expression)
-			if p.arkUI && ast.IsPropertyAccessExpression(expression) && expression.Name().Text() == "stateStyles" {
-				p.arkUIStyles = true
-			}
+			p.arkUICallback = (p.arkUIBuild || p.arkUIStyles) && p.isArkUIIteration(expression)
+			var stateProperty bool
+			typeArguments, stateProperty = p.etsAttributeArguments(expression, pos, typeArguments)
 			argumentList := p.parseArkUIArgumentList(expression)
+			if stateProperty {
+				p.etsStateRoot = ""
+			}
 			p.arkUIExpression, p.arkUICallback, p.arkUIStyles = savedExpression, savedCallback, savedStyles
-			var etsBody *ast.Node
-			if isComponent && p.token == ast.KindOpenBraceToken {
-				etsBody = p.parseBlock(false, nil)
-			}
 			isOptionalChain := questionDotToken != nil || p.tryReparseOptionalChain(expression)
-			expression = p.checkJSSyntax(p.finishNode(p.factory.NewCallExpression(expression, questionDotToken, typeArguments, argumentList, etsBody, core.IfElse(isOptionalChain, ast.NodeFlagsOptionalChain, ast.NodeFlagsNone)), pos))
-			if isComponent {
-				expression.Flags |= ast.NodeFlagsEtsComponent
-			}
+			expression = p.checkJSSyntax(p.finishNode(p.factory.NewCallExpression(expression, questionDotToken, typeArguments, argumentList, nil, core.IfElse(isOptionalChain, ast.NodeFlagsOptionalChain, ast.NodeFlagsNone)), pos))
 			p.unparseExpressionWithTypeArguments(inner, typeArguments, expression)
 			continue
 		}
@@ -5651,29 +5710,13 @@ func (p *Parser) parseTemplateSpan(isTaggedTemplate bool) *ast.Node {
 }
 
 func (p *Parser) parsePrimaryExpression() *ast.Expression {
-	if p.scriptKind == core.ScriptKindETS && p.arkUI && p.token == ast.KindIdentifier {
-		text := p.scanner.TokenValue()
-		if len(text) > 1 && text[0] == '$' {
-			node := p.parseIdentifier()
-			node.Flags |= ast.NodeFlagsEtsBinding
-			return node
+	if p.scriptKind == core.ScriptKindETS && p.token == ast.KindDotToken {
+		if p.arkUIStyleDeclaration != nil {
+			return p.etsVirtualIdentifier(p.arkUIStyleDeclaration.Instance, p.nodePos())
 		}
-	}
-	if p.arkUIStyles && p.token == ast.KindOpenBraceToken && p.lookAhead(func(p *Parser) bool { return p.nextToken() == ast.KindDotToken }) {
-		pos := p.nodePos()
-		parameters := p.factory.NewNodeList(nil)
-		parameters.Loc = core.NewTextRange(pos, pos)
-		arrow := p.factory.NewToken(ast.KindEqualsGreaterThanToken)
-		arrow.Loc = core.NewTextRange(pos, pos)
-		body := p.parseBlock(false, nil)
-		node := p.finishNode(p.factory.NewArrowFunction(nil, nil, parameters, nil, nil, arrow, body), pos)
-		node.Flags |= ast.NodeFlagsEtsStylesBlock
-		return node
-	}
-	if p.scriptKind == core.ScriptKindETS && p.arkUIStyles && p.token == ast.KindDotToken {
-		result := p.finishNode(p.factory.NewKeywordExpression(ast.KindThisKeyword), p.nodePos())
-		result.Flags |= ast.NodeFlagsEtsImplicitReceiver
-		return result
+		if p.etsStateRoot != "" && (p.arkUIBuild || p.arkUIStyles) {
+			return p.etsVirtualIdentifier(p.etsStateRoot+"Instance", p.nodePos())
+		}
 	}
 	switch p.token {
 	case ast.KindNoSubstitutionTemplateLiteral:
@@ -5715,6 +5758,19 @@ func (p *Parser) parsePrimaryExpression() *ast.Expression {
 		return p.parseTemplateExpression(false /*isTaggedTemplate*/)
 	case ast.KindPrivateIdentifier:
 		return p.parsePrivateIdentifier()
+	}
+	// OH parsePrimaryExpression checks registered names after primary keywords.
+	if p.scriptKind == core.ScriptKindETS && p.arkUI && !p.arkUINew && p.opts.Ets.Components.Contains(p.scanner.TokenText()) {
+		pos := p.nodePos()
+		name := p.parseBindingIdentifier()
+		arguments := p.parseArgumentList()
+		var body *ast.Node
+		if p.token == ast.KindOpenBraceToken {
+			body = p.parseFunctionBlock(ParseFlagsNone, nil)
+		}
+		result := p.finishNode(p.factory.NewCallExpression(name, nil, nil, arguments, body, ast.NodeFlagsNone), pos)
+		result.Flags |= ast.NodeFlagsEtsComponent
+		return result
 	}
 	return p.parseIdentifierWithDiagnostic(diagnostics.Expression_expected, nil)
 }
@@ -5832,7 +5888,9 @@ func (p *Parser) parseFunctionExpression() *ast.Expression {
 	typeParameters := p.parseTypeParameters()
 	parameters := p.parseParameters(signatureFlags)
 	returnType := p.parseReturnType(ast.KindColonToken, false /*isType*/)
-	body := p.parseArkUIFunctionBody(signatureFlags, nil, nil, false)
+	restoreEts := p.enterEtsFunction(nil, "", false)
+	body := p.parseFunctionBlockOrSemicolon(signatureFlags, nil)
+	restoreEts()
 	p.contextFlags = saveContexFlags
 	result := p.factory.NewFunctionExpression(modifiers, asteriskToken, name, typeParameters, parameters, returnType, nil /*fullSignature*/, body)
 	p.finishNode(result, pos)
@@ -5872,6 +5930,7 @@ func (p *Parser) unparseExpressionWithTypeArguments(expression *ast.Node, typeAr
 }
 
 func (p *Parser) parseNewExpressionOrNewDotTarget() *ast.Node {
+	p.arkUINew = p.arkUI
 	pos := p.nodePos()
 	p.parseExpected(ast.KindNewKeyword)
 	if p.parseOptional(ast.KindDotToken) {
@@ -5893,6 +5952,7 @@ func (p *Parser) parseNewExpressionOrNewDotTarget() *ast.Node {
 	if p.token == ast.KindOpenParenToken {
 		argumentList = p.parseArgumentList()
 	}
+	p.arkUINew = false
 	result := p.checkJSSyntax(p.finishNode(p.factory.NewNewExpression(expression, typeArguments, argumentList), pos))
 	p.unparseExpressionWithTypeArguments(expression, typeArguments, result)
 	return result
@@ -5986,6 +6046,10 @@ func (p *Parser) createIdentifierWithDiagnostic(isIdentifier bool, diagnosticMes
 		}
 		return p.createIdentifier(true /*isIdentifier*/)
 	}
+	// OH createIdentifier supplies the implicit property name in stateStyles.
+	if p.token == ast.KindDotToken && p.etsStateRoot != "" && (p.arkUIBuild || p.arkUIStyles) {
+		return p.etsVirtualIdentifier(p.etsStateRoot+"Instance", p.nodePos())
+	}
 	// Only for end of file because the error gets reported incorrectly on embedded script tags.
 	reportAtCurrentPosition := p.token == ast.KindEndOfFile
 	if diagnosticMessage != nil {
@@ -6051,6 +6115,9 @@ func (p *Parser) nextTokenIsSlash() bool {
 }
 
 func (p *Parser) scanTypeMemberStart() bool {
+	if p.scriptKind == core.ScriptKindETS && p.token == ast.KindAtToken {
+		return !p.isAnnotationDeclaration()
+	}
 	// Return true if we have the start of a signature member
 	if p.token == ast.KindOpenParenToken || p.token == ast.KindLessThanToken || p.token == ast.KindGetKeyword || p.token == ast.KindSetKeyword {
 		return true
@@ -6081,7 +6148,7 @@ func (p *Parser) scanTypeMemberStart() bool {
 func (p *Parser) scanClassMemberStart() bool {
 	idToken := ast.KindUnknown
 	if p.token == ast.KindAtToken {
-		return true
+		return !p.isAnnotationDeclaration()
 	}
 	// Eat up all modifiers, but hold on to the last one in case it is actually an identifier.
 	for ast.IsModifierKind(p.token) {
@@ -6197,7 +6264,7 @@ func (p *Parser) isStartOfDeclaration() bool {
 
 func (p *Parser) scanStartOfDeclaration() bool {
 	for {
-		if p.isStructDeclaration() {
+		if p.isStructDeclaration() || p.isAnnotationDeclaration() {
 			return true
 		}
 		switch p.token {

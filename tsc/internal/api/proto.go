@@ -91,6 +91,7 @@ const (
 	MethodGetSourceFile                Method = "getSourceFile"
 	MethodGetSourceFileNames           Method = "getSourceFileNames"
 	MethodGetSourceFileMetadata        Method = "getSourceFileMetadata"
+	MethodGetProgramSourceGraph        Method = "getProgramSourceGraph"
 	MethodGetConfigFileNames           Method = "getConfigFileNames"
 	MethodGetConfigSourceFile          Method = "getConfigSourceFile"
 	MethodResolveName                  Method = "resolveName"
@@ -166,6 +167,7 @@ const (
 	MethodGetTrueTypeOfConditionalType      Method = "getTrueTypeOfConditionalType"
 	MethodGetFalseTypeOfConditionalType     Method = "getFalseTypeOfConditionalType"
 	MethodGetConstantValue                  Method = "getConstantValue"
+	MethodGetAnnotationInfo                 Method = "getAnnotationInfo"
 	MethodGetSignatureFromDeclaration       Method = "getSignatureFromDeclaration"
 	MethodGetExportSpecifierLocalTarget     Method = "getExportSpecifierLocalTargetSymbol"
 	MethodGetAliasedSymbol                  Method = "getAliasedSymbol"
@@ -191,6 +193,7 @@ const (
 	MethodGetSyntacticDiagnostics         Method = "getSyntacticDiagnostics"
 	MethodGetBindDiagnostics              Method = "getBindDiagnostics"
 	MethodGetSemanticDiagnostics          Method = "getSemanticDiagnostics"
+	MethodGetArkTSLinterDiagnostics       Method = "getArkTSLinterDiagnostics"
 	MethodGetSuggestionDiagnostics        Method = "getSuggestionDiagnostics"
 	MethodGetDeclarationDiagnostics       Method = "getDeclarationDiagnostics"
 	MethodGetProgramDiagnostics           Method = "getProgramDiagnostics"
@@ -448,6 +451,7 @@ var unmarshalers = map[Method]func([]byte) (any, error){
 	MethodGetSourceFile:                unmarshallerFor[GetSourceFileParams],
 	MethodGetSourceFileNames:           unmarshallerFor[GetSourceFileNamesParams],
 	MethodGetSourceFileMetadata:        unmarshallerFor[GetSourceFileParams],
+	MethodGetProgramSourceGraph:        unmarshallerFor[GetSourceFileNamesParams],
 	MethodGetConfigFileNames:           unmarshallerFor[GetProjectDiagnosticsParams],
 	MethodGetConfigSourceFile:          unmarshallerFor[GetSourceFileParams],
 	MethodGetSymbolAtPosition:          unmarshallerFor[GetSymbolAtPositionParams],
@@ -529,6 +533,7 @@ var unmarshalers = map[Method]func([]byte) (any, error){
 	MethodGetTypeArguments:                  unmarshallerFor[CheckerTypeParams],
 	MethodGetImportAdderEdits:               unmarshallerFor[GetImportAdderEditsParams],
 	MethodGetConstantValue:                  unmarshallerFor[CheckerNodeParams],
+	MethodGetAnnotationInfo:                 unmarshallerFor[CheckerNodeParams],
 	MethodGetSignatureFromDeclaration:       unmarshallerFor[CheckerNodeParams],
 	MethodGetExportSpecifierLocalTarget:     unmarshallerFor[CheckerNodeParams],
 	MethodGetAliasedSymbol:                  unmarshallerFor[CheckerSymbolParams],
@@ -568,6 +573,7 @@ var unmarshalers = map[Method]func([]byte) (any, error){
 	MethodGetSyntacticDiagnostics:           unmarshallerFor[GetDiagnosticsParams],
 	MethodGetBindDiagnostics:                unmarshallerFor[GetDiagnosticsParams],
 	MethodGetSemanticDiagnostics:            unmarshallerFor[GetDiagnosticsParams],
+	MethodGetArkTSLinterDiagnostics:         unmarshallerFor[GetDiagnosticsParams],
 	MethodGetSuggestionDiagnostics:          unmarshallerFor[GetDiagnosticsParams],
 	MethodGetDeclarationDiagnostics:         unmarshallerFor[GetDiagnosticsParams],
 	MethodGetProgramDiagnostics:             unmarshallerFor[GetProjectDiagnosticsParams],
@@ -1088,6 +1094,18 @@ type SourceFileMetadata struct {
 	PackageJsonType       string              `json:"packageJsonType"`
 	PackageJsonDirectory  string              `json:"packageJsonDirectory"`
 	ImpliedNodeFormat     core.ResolutionMode `json:"impliedNodeFormat"`
+}
+
+// ProgramSourceGraph carries compiler-owned module resolution facts. Build
+// hosts consume these facts without reimplementing TypeScript resolution.
+type ProgramSourceGraph struct {
+	Files              []ProgramSourceGraphFile `json:"files"`
+	TypeReferenceFiles []string                 `json:"typeReferenceFiles"`
+}
+
+type ProgramSourceGraphFile struct {
+	FileName     string   `json:"fileName"`
+	Dependencies []string `json:"dependencies"`
 }
 
 type ResolveNameParams struct {

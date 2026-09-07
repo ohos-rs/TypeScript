@@ -86,6 +86,7 @@ export interface NodeArray<T extends Node> extends ReadonlyArray<T>, ReadonlyTex
 }
 
 export interface Node extends ReadonlyTextRange {
+    readonly virtual?: boolean;
     readonly kind: SyntaxKind;
     readonly flags: NodeFlags;
     readonly parent: Node;
@@ -128,6 +129,11 @@ export interface MappedDiagnosticDirective {
 }
 
 export interface SourceFile extends Node {
+    /** Parse identity, retained when a remote AST is encoded again. */
+    readonly parseOptions?: {
+        readonly flags: number;
+        readonly ets: import("../api/proto.generated.ts").EtsOptions;
+    };
     readonly kind: SyntaxKind.SourceFile;
     readonly statements: NodeArray<Statement>;
     readonly endOfFileToken: EndOfFile;

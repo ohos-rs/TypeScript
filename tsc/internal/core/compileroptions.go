@@ -17,6 +17,68 @@ import (
 type CompilerOptions struct {
 	_ noCopy
 
+	// OH compiler host options, supplied by the build service (not CLI flags).
+	IsCompileJsHar Tristate `json:"isCompileJsHar,omitzero"`
+	ModuleRootPath string   `json:"moduleRootPath,omitzero"`
+	MaxFlowDepth   float64  `json:"maxFlowDepth,omitzero"`
+	// OH exposes this option in commandLineParser.ts as well as the host API.
+	EtsAnnotationsEnable   Tristate   `json:"etsAnnotationsEnable,omitzero"`
+	Ets                    EtsOptions `json:"ets,omitzero"`
+	CompileSdkVersion      *float64   `json:"compileSdkVersion,omitzero"`
+	EtsLoaderPath          string     `json:"etsLoaderPath,omitzero"`
+	TsImportSoCheck        Tristate   `json:"tsImportSoCheck,omitzero"`
+	NeedDoArkTsLinter      Tristate   `json:"needDoArkTsLinter,omitzero"`
+	IsCompatibleVersion    Tristate   `json:"isCompatibleVersion,omitzero"`
+	TsImportSendableEnable Tristate   `json:"tsImportSendableEnable,omitzero"`
+	// OH ets_checker.ts::setCompilerOptions and moduleNameResolver.ts. These
+	// values affect the checked source graph and must participate in compiler
+	// option identity rather than being reconstructed by an external caller.
+	PackageManagerType                     string   `json:"packageManagerType,omitzero"`
+	EmitNodeModulesFiles                   Tristate `json:"emitNodeModulesFiles,omitzero"`
+	SkipTscOhModuleCheck                   Tristate `json:"skipTscOhModuleCheck,omitzero"`
+	SkipArkTSStaticBlocksCheck             Tristate `json:"skipArkTSStaticBlocksCheck,omitzero"`
+	SkipPathsInKeyForCompilationSettings   Tristate `json:"skipPathsInKeyForCompilationSettings,omitzero"`
+	SkipBaseUrlInKeyForCompilationSettings Tristate `json:"skipBaseUrlInKeyForCompilationSettings,omitzero"`
+	CompatibleSdkVersion                   *float64 `json:"compatibleSdkVersion,omitzero"`
+	CompatibleSdkVersionStage              string   `json:"compatibleSdkVersionStage,omitzero"`
+	SkipOhModulesLint                      Tristate `json:"skipOhModulesLint,omitzero"`
+	EnableStrictCheckOHModule              Tristate `json:"enableStrictCheckOHModule,omitzero"`
+	DisableStrictCheckPaths                []string `json:"disableStrictCheckPaths,omitzero"`
+	DisableSendableCheckRules              []string `json:"disableSendableCheckRules,omitzero"`
+	MixCompile                             Tristate `json:"mixCompile,omitzero"`
+	StrictCheckerOnly                      Tristate `json:"strictCheckerOnly,omitzero"`
+	// The original compiler host supplies these already-resolved build inputs.
+	// Keeping them typed lets the Go resolver reproduce resolveModuleNames
+	// without invoking the JavaScript host.
+	OhSdkConfigs          []OhSdkConfig       `json:"ohSdkConfigs,omitzero"`
+	OhSystemModules       []string            `json:"ohSystemModules,omitzero"`
+	OhSdkConfigPrefixes   []string            `json:"ohSdkConfigPrefixes,omitzero"`
+	OhFallbackModuleRoots []string            `json:"ohFallbackModuleRoots,omitzero"`
+	OhLoaderModuleRoot    string              `json:"ohLoaderModuleRoot,omitzero"`
+	OhProjectPath         string              `json:"ohProjectPath,omitzero"`
+	OhExternalApiPaths    []string            `json:"ohExternalApiPaths,omitzero"`
+	OhPackageExports      map[string][]string `json:"ohPackageExports,omitzero"`
+	// ets_checker.ts installs SDK validation callbacks closed over these
+	// projectConfig values. The native checker owns the same behavior directly,
+	// so the callback inputs are explicit immutable compiler state.
+	OhRuntimeOS                  string   `json:"ohRuntimeOS,omitzero"`
+	OhOriginCompatibleSdkVersion string   `json:"ohOriginCompatibleSdkVersion,omitzero"`
+	OhProjectRootPath            string   `json:"ohProjectRootPath,omitzero"`
+	OhModulePath                 string   `json:"ohModulePath,omitzero"`
+	OhAllModulePaths             []string `json:"ohAllModulePaths,omitzero"`
+	OhGlobalModulePaths          []string `json:"ohGlobalModulePaths,omitzero"`
+	OhArkUIDeclarationDirs       []string `json:"ohArkUIDeclarationDirs,omitzero"`
+	OhRequestPermissions         []string `json:"ohRequestPermissions,omitzero"`
+	OhSyscapIntersection         []string `json:"ohSyscapIntersection,omitzero"`
+	OhSyscapUnion                []string `json:"ohSyscapUnion,omitzero"`
+	OhDeviceTypes                []string `json:"ohDeviceTypes,omitzero"`
+	OhCardEntryFiles             []string `json:"ohCardEntryFiles,omitzero"`
+	OhCrossplatform              Tristate `json:"ohCrossplatform,omitzero"`
+	OhIgnoreCrossplatformCheck   Tristate `json:"ohIgnoreCrossplatformCheck,omitzero"`
+	OhCompileMode                string   `json:"ohCompileMode,omitzero"`
+	OhBundleType                 string   `json:"ohBundleType,omitzero"`
+	OhApiCompatibilityCheck      string   `json:"ohApiCompatibilityCheck,omitzero"`
+
 	AllowJs                                   Tristate                                  `json:"allowJs,omitzero"`
 	AllowArbitraryExtensions                  Tristate                                  `json:"allowArbitraryExtensions,omitzero"`
 	AllowImportingTsExtensions                Tristate                                  `json:"allowImportingTsExtensions,omitzero"`
@@ -158,6 +220,10 @@ type CompilerOptions struct {
 	SingleThreaded Tristate `json:"singleThreaded,omitzero" internal:"true"`
 	Quiet          Tristate `json:"quiet,omitzero" internal:"true"`
 	Checkers       *int     `json:"checkers,omitzero" internal:"true"`
+}
+
+type OhSdkConfig struct {
+	ApiPaths []string `json:"apiPaths,omitzero"`
 }
 
 // noCopy may be embedded into structs which must not be copied
@@ -315,11 +381,56 @@ func (options *CompilerOptions) GetEffectiveTypeRoots(currentDirectory string) (
 	}
 
 	typeRoots := make([]string, 0, strings.Count(baseDir, "/"))
+	modulesDirectory := options.PackageManagerModulesDirectory()
 	tspath.ForEachAncestorDirectory(baseDir, func(dir string) (any, bool) {
-		typeRoots = append(typeRoots, tspath.CombinePaths(dir, "node_modules", "@types"))
+		typeRoots = append(typeRoots, tspath.CombinePaths(dir, modulesDirectory, "@types"))
 		return nil, false
 	})
 	return typeRoots, false
+}
+
+// PackageManagerModulesDirectory and PackageManagerManifestName are the Go
+// equivalents of OH moduleNameResolver.ts::getModuleByPMType and
+// getPackageJsonByPMType. The source treats only the exact "ohpm" value as the
+// OH package manager; every other value retains npm behavior.
+func (options *CompilerOptions) PackageManagerModulesDirectory() string {
+	if options.PackageManagerType == "ohpm" {
+		return "oh_modules"
+	}
+	return "node_modules"
+}
+
+func (options *CompilerOptions) PackageManagerManifestName() string {
+	if options.PackageManagerType == "ohpm" {
+		return "oh-package.json5"
+	}
+	return "package.json"
+}
+
+func (options *CompilerOptions) UsesOHModuleResolution() bool {
+	return options.EtsAnnotationsEnable == TSTrue ||
+		options.EtsLoaderPath != "" ||
+		options.PackageManagerType == "ohpm" ||
+		len(options.OhSdkConfigs) != 0 ||
+		len(options.OhFallbackModuleRoots) != 0 ||
+		options.OhLoaderModuleRoot != "" ||
+		options.OhProjectPath != "" ||
+		len(options.OhExternalApiPaths) != 0 ||
+		len(options.OhPackageExports) != 0
+}
+
+func (options *CompilerOptions) IsOHSdkModuleSpecifier(moduleName string) bool {
+	prefixes := options.OhSdkConfigPrefixes
+	if len(prefixes) == 0 {
+		prefixes = []string{"ohos", "system", "kit", "arkts"}
+	}
+	if !strings.HasPrefix(moduleName, "@") {
+		return false
+	}
+	prefix, _, found := strings.Cut(moduleName[1:], ".")
+	return found && slices.ContainsFunc(prefixes, func(candidate string) bool {
+		return strings.EqualFold(candidate, prefix)
+	})
 }
 
 // UsesWildcardTypes returns true if this option's types array includes "*"

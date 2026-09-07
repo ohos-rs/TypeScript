@@ -20,11 +20,11 @@ Build one or more projects and their dependencies, if out of date
 [94m--checkers[39m
 Set the number of checkers per project.
 
-[94m--help, -h[39m
-Print this message.
-
 [94m--help, -?[39m
 
+
+[94m--help, -h[39m
+Print this message.
 
 [94m--ignoreConfig[39m
 Ignore the tsconfig found and build with commandline options and files.
@@ -518,6 +518,16 @@ Emit design-type metadata for decorated declarations in source files.
 type: boolean
 default: false
 
+[94m--emitNodeModulesFiles[39m
+Unknown build option '{0}'.
+type: boolean
+default: false
+
+[94m--etsAnnotationsEnable[39m
+Enable support of ETS annotations
+type: boolean
+default: false
+
 [94m--experimentalDecorators[39m
 Enable experimental support for legacy experimental decorators.
 type: boolean
@@ -562,6 +572,9 @@ default: "auto": Treat files with imports, exports, import.meta, jsx (with jsx: 
 Disable including any library files, including the default lib.d.ts.
 type: boolean
 default: false
+
+[94m--packageManagerType[39m
+Unknown build option '{0}'.
 
 [94m--reactNamespace[39m
 Specify the object invoked for 'createElement'. This only applies when targeting 'react' JSX emit.

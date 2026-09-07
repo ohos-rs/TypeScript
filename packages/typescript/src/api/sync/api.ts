@@ -83,6 +83,7 @@ import type {
     IntrinsicTypeMethod,
     LSPUpdateSnapshotParams,
     ParsedCommandLine,
+    ProgramSourceGraph,
     ProjectReference,
     ProjectResponse,
     ReadConfigFileResponse,
@@ -2527,6 +2528,68 @@ export class Program implements FormatDiagnosticsHost {
                     : Array.isArray(file) ? file
                     : [file];
                 const data = yield* apiRequest("getSemanticDiagnostics", {
+                    snapshot: owner.snapshotId,
+                    project: owner.project.id,
+                    ...(files !== undefined ? { files } : {}),
+                });
+                return data ?? [];
+            },
+        );
+    }
+
+    /**
+     * Returns the compiler-owned resolved source graph and resolved type-reference
+     * files. Consumers can make reachability decisions without reproducing module
+     * resolution outside the compiler.
+     */
+    get getProgramSourceGraph(): {
+        (): ProgramSourceGraph;
+        gen(): Generator<ProtocolRequest, ProgramSourceGraph, ProtocolResponse["result"]>;
+    } {
+        const owner = this;
+        return cacheGeneratorMethod(
+            owner,
+            "getProgramSourceGraph",
+            function (): ProgramSourceGraph {
+                return owner.client.apiRequest("getProgramSourceGraph", {
+                    snapshot: owner.snapshotId,
+                    project: owner.project.id,
+                });
+            },
+            function* (): Generator<ProtocolRequest, ProgramSourceGraph, ProtocolResponse["result"]> {
+                return yield* apiRequest("getProgramSourceGraph", {
+                    snapshot: owner.snapshotId,
+                    project: owner.project.id,
+                });
+            },
+        );
+    }
+
+    /** Get ArkTS 1.1 linter diagnostics for specific files or all files. */
+    get getArkTSLinterDiagnostics(): {
+        (file?: DocumentIdentifier | readonly DocumentIdentifier[]): readonly Diagnostic[];
+        gen(file?: DocumentIdentifier | readonly DocumentIdentifier[]): Generator<ProtocolRequest, readonly Diagnostic[], ProtocolResponse["result"]>;
+    } {
+        const owner = this;
+        return cacheGeneratorMethod(
+            owner,
+            "getArkTSLinterDiagnostics",
+            function (file?: DocumentIdentifier | readonly DocumentIdentifier[]): readonly Diagnostic[] {
+                const files = file === undefined ? undefined
+                    : Array.isArray(file) ? file
+                    : [file];
+                const data = owner.client.apiRequest("getArkTSLinterDiagnostics", {
+                    snapshot: owner.snapshotId,
+                    project: owner.project.id,
+                    ...(files !== undefined ? { files } : {}),
+                });
+                return data ?? [];
+            },
+            function* (file?: DocumentIdentifier | readonly DocumentIdentifier[]): Generator<ProtocolRequest, readonly Diagnostic[], ProtocolResponse["result"]> {
+                const files = file === undefined ? undefined
+                    : Array.isArray(file) ? file
+                    : [file];
+                const data = yield* apiRequest("getArkTSLinterDiagnostics", {
                     snapshot: owner.snapshotId,
                     project: owner.project.id,
                     ...(files !== undefined ? { files } : {}),

@@ -196,6 +196,11 @@ func processAllProgramFiles(
 				}
 				// !!! error on unknown name
 			}
+			// OH program.ts::processRootFile loads ets.libs as paths (not
+			// standard library names), only in the explicit options.lib branch.
+			for name := range compilerOptions.Ets.Libs.Values() {
+				loader.addRootTask(name, &LibFile{Name: name, path: name}, &FileIncludeReason{kind: fileIncludeKindLibFile})
+			}
 		}
 	}
 
@@ -406,6 +411,8 @@ func (p *fileLoader) parseSourceFile(t *parseTask) *ast.SourceFile {
 		FileName:                       t.normalizedFilePath,
 		Path:                           path,
 		ExternalModuleIndicatorOptions: ast.GetExternalModuleIndicatorOptions(t.normalizedFilePath, options, t.metadata),
+		EtsAnnotationsEnable:           options.EtsAnnotationsEnable == core.TSTrue,
+		Ets:                            options.Ets,
 	}
 	if tspath.FileExtensionIsOneOf(t.normalizedFilePath, p.contentMapperExtensions) {
 		return p.parseContentMappedFile(parseOptions)
@@ -876,7 +883,12 @@ func (p *fileLoader) resolveImportsAndModuleAugmentations(t *parseTask) {
 			resolutionsInFile[module.ModeAwareCacheKey{Name: moduleName, Mode: mode}] = resolvedModule
 			resolutionsTrace = append(resolutionsTrace, trace...)
 
-			if !resolvedModule.IsResolved() {
+			// OH program.ts::processImportedModules does not materialize a
+			// dependency that is outside the package's oh-exports surface when
+			// the importer is project source. Keep the resolution record so the
+			// checker can issue TS28045 at the import site.
+			isSourceOrExternalCode := !strings.Contains(tspath.NormalizePath(file.FileName()), "/oh_modules/")
+			if !resolvedModule.IsResolved() || (resolvedModule.IsNotOhExport && isSourceOrExternalCode) {
 				continue
 			}
 
@@ -884,7 +896,8 @@ func (p *fileLoader) resolveImportsAndModuleAugmentations(t *parseTask) {
 			isFromNodeModulesSearch := resolvedModule.IsExternalLibraryImport
 			// Don't treat redirected files as JS files.
 			isJsFile := !resolvedModule.ResolvedUsingExtraExtensions && !tspath.FileExtensionIsOneOf(resolvedFileName, tspath.SupportedTSExtensionsWithJsonFlat) && p.projectReferenceFileMapper.getRedirectParsedCommandLineForResolution(ast.NewHasFileName(resolvedFileName, p.toPath(resolvedFileName))) == nil
-			isJsFileFromNodeModules := isFromNodeModulesSearch && isJsFile && strings.Contains(resolvedFileName, "/node_modules/")
+			isJsFileFromNodeModules := isFromNodeModulesSearch && isJsFile &&
+				(strings.Contains(resolvedFileName, "/node_modules/") || strings.Contains(resolvedFileName, "/oh_modules/"))
 
 			// add file to program only if:
 			// - resolution was successful

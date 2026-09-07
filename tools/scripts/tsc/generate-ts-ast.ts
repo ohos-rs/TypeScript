@@ -698,6 +698,8 @@ function generateFactory(): string {
     out.push(`export class NodeObject {`);
     out.push(`    readonly kind: SyntaxKind;`);
     out.push(`    flags: NodeFlags = 0 as NodeFlags;`);
+    out.push(`    virtual: boolean = false;`);
+    out.push(`    parseOptions?: SourceFile["parseOptions"];`);
     out.push(`    readonly pos: number = -1;`);
     out.push(`    readonly end: number = -1;`);
     out.push(`    parent: Node = undefined!;`);
@@ -799,6 +801,8 @@ function generateFactory(): string {
     out.push(`    const data = cloneNodeData(node);`);
     out.push(`    const clone = new NodeObject(node.kind, data);`);
     out.push(`    (clone as any).flags = node.flags;`);
+    out.push(`    clone.virtual = node.virtual ?? false;`);
+    out.push(`    if (node.kind === SyntaxKind.SourceFile) clone.parseOptions = (node as unknown as SourceFile).parseOptions;`);
     out.push(`    (clone as any).pos = node.pos;`);
     out.push(`    (clone as any).end = node.end;`);
     out.push(`    return clone as unknown as T;`);

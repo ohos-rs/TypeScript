@@ -72,6 +72,10 @@ type ResolvedModule struct {
 	PackageId                    PackageId
 	IsExternalLibraryImport      bool
 	AlternateResult              string
+	// Set by the OH resolver when a materialized dependency path is not in the
+	// package's source-provided oh-exports set. checker.ts consumes this flag to
+	// produce TS28045 instead of exposing the module symbol.
+	IsNotOhExport bool
 }
 
 func (r *ResolvedModule) IsResolved() bool {

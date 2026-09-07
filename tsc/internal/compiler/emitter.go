@@ -178,6 +178,20 @@ func getScriptTransformers(emitContext *printer.EmitContext, host printer.EmitHo
 	return tx
 }
 
+// Annotation classification is checker-owned. Do not mutate shared source AST
+// flags during checking: independent checker shards can read the same nodes.
+func (e *emitter) containsArkUISyntax(file *ast.SourceFile) bool {
+	if file.ScriptKind != core.ScriptKindETS {
+		return false
+	}
+	var visit ast.Visitor
+	visit = func(node *ast.Node) bool {
+		return ast.IsStructDeclaration(node) || ast.IsAnnotationDeclaration(node) || ast.IsEtsComponentExpression(node) || ast.IsDecorator(node) && ast.HasEtsDecorator(node.Parent, e.host.Options().Ets) ||
+			ast.IsDecorator(node) && e.host.GetEmitResolver().IsEtsAnnotation(node) || node.ForEachChild(visit)
+	}
+	return visit(file.AsNode())
+}
+
 func (e *emitter) emitJSFile(sourceFile *ast.SourceFile, jsFilePath string, sourceMapFilePath string) {
 	options := e.host.Options()
 
@@ -190,7 +204,7 @@ func (e *emitter) emitJSFile(sourceFile *ast.SourceFile, jsFilePath string, sour
 		return
 	}
 
-	if ast.ContainsArkUISyntax(sourceFile) {
+	if e.containsArkUISyntax(sourceFile) {
 		e.emitResult.EmitSkipped = true
 		e.emitterDiagnostics.Add(ast.NewDiagnostic(sourceFile, core.NewTextRange(0, 0), diagnostics.ArkUI_JavaScript_emit_requires_the_OpenHarmony_SDK_compiler_Use_noEmit_or_emitDeclarationOnly))
 		return

@@ -582,6 +582,11 @@ var CompletionGlobalKeywords = []fourslash.CompletionsExpectedItem{
 
 var CompletionGlobalTypeDecls = []fourslash.CompletionsExpectedItem{
 	&lsproto.CompletionItem{
+		Label:    "ESObject",
+		Kind:     new(lsproto.CompletionItemKindClass),
+		SortText: new(string(ls.SortTextGlobalsOrKeywords)),
+	},
+	&lsproto.CompletionItem{
 		Label:    "Symbol",
 		Kind:     new(lsproto.CompletionItemKindInterface),
 		SortText: new(string(ls.SortTextGlobalsOrKeywords)),

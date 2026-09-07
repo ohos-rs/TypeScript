@@ -66,6 +66,7 @@ import type {
     IntrinsicTypeMethod,
     LSPUpdateSnapshotParams,
     ParsedCommandLine,
+    ProgramSourceGraph,
     ProjectReference,
     ProjectResponse,
     ReadConfigFileResponse,
@@ -1323,6 +1324,31 @@ export class Program implements FormatDiagnosticsHost {
             : Array.isArray(file) ? file
             : [file];
         const data = await this.client.apiRequest("getSemanticDiagnostics", {
+            snapshot: this.snapshotId,
+            project: this.project.id,
+            ...(files !== undefined ? { files } : {}),
+        });
+        return data ?? [];
+    }
+
+    /**
+     * Returns the compiler-owned resolved source graph and resolved type-reference
+     * files. Consumers can make reachability decisions without reproducing module
+     * resolution outside the compiler.
+     */
+    async getProgramSourceGraph(): Promise<ProgramSourceGraph> {
+        return await this.client.apiRequest("getProgramSourceGraph", {
+            snapshot: this.snapshotId,
+            project: this.project.id,
+        });
+    }
+
+    /** Get ArkTS 1.1 linter diagnostics for specific files or all files. */
+    async getArkTSLinterDiagnostics(file?: DocumentIdentifier | readonly DocumentIdentifier[]): Promise<readonly Diagnostic[]> {
+        const files = file === undefined ? undefined
+            : Array.isArray(file) ? file
+            : [file];
+        const data = await this.client.apiRequest("getArkTSLinterDiagnostics", {
             snapshot: this.snapshotId,
             project: this.project.id,
             ...(files !== undefined ? { files } : {}),

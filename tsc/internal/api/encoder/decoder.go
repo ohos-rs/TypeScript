@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
+	"github.com/microsoft/TypeScript/tsc/internal/json"
 	"github.com/microsoft/TypeScript/tsc/internal/tspath"
 )
 
@@ -173,6 +174,7 @@ func (d *astDecoder) decode() (*ast.Node, error) {
 		}
 		node.Loc = core.NewTextRange(int(pos), int(end))
 		node.Flags = ast.NodeFlags(d.nodeField(i, NodeOffsetFlags))
+		node.Virtual = d.nodeField(i, NodeOffsetVirtual) != 0
 		d.nodes[i] = node
 	}
 
@@ -266,8 +268,9 @@ func (d *astDecoder) decodeExtendedData_SourceFile(data uint32, childIndices []i
 	// Recover parse options from header.
 	parseOpts := readLE32(d.raw, HeaderOffsetParseOptions)
 	opts := ast.SourceFileParseOptions{
-		FileName: fileName,
-		Path:     tspath.Path(path),
+		FileName:             fileName,
+		Path:                 tspath.Path(path),
+		EtsAnnotationsEnable: parseOpts&4 != 0,
 		ExternalModuleIndicatorOptions: ast.ExternalModuleIndicatorOptions{
 			JSX:   parseOpts&1 != 0,
 			Force: parseOpts&2 != 0,
@@ -275,6 +278,11 @@ func (d *astDecoder) decodeExtendedData_SourceFile(data uint32, childIndices []i
 	}
 
 	// Collect children: first is statements NodeList, second is EndOfFile.
+	if index := readLE32(d.raw, HeaderOffsetEtsOptions); index != noStructuredData {
+		if err := json.Unmarshal([]byte(d.getString(index)), &opts.Ets); err != nil {
+			return nil, err
+		}
+	}
 	var stmts *ast.NodeList
 	var endOfFile *ast.Node
 	for _, ci := range childIndices {

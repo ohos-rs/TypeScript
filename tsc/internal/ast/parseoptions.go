@@ -9,6 +9,10 @@ type SourceFileParseOptions struct {
 	FileName                       string
 	Path                           tspath.Path
 	ExternalModuleIndicatorOptions ExternalModuleIndicatorOptions
+	// OH parser.ts::inAllowAnnotationContext. This is part of parse identity,
+	// including the project parse cache and incremental source-file reuse.
+	EtsAnnotationsEnable bool
+	Ets                  core.EtsOptions
 }
 
 type ExternalModuleIndicatorOptions struct {

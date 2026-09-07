@@ -5,12 +5,16 @@ import {
     SyntaxKind,
 } from "../../ast/index.ts";
 import type { TimingCollector } from "../timing.ts";
+import { Wtf8Decoder } from "./wtf8.ts";
 import {
     HEADER_OFFSET_HASH_HI0,
     HEADER_OFFSET_HASH_HI1,
     HEADER_OFFSET_HASH_LO0,
     HEADER_OFFSET_HASH_LO1,
     HEADER_OFFSET_PARSE_OPTIONS,
+    HEADER_OFFSET_ETS_OPTIONS,
+    HEADER_OFFSET_STRING_TABLE_OFFSETS,
+    HEADER_OFFSET_STRING_TABLE,
     NODE_DATA_TYPE_CHILDREN,
     NODE_DATA_TYPE_EXTENDED,
     NODE_DATA_TYPE_STRING,
@@ -20,6 +24,7 @@ import {
     NODE_OFFSET_NEXT,
     NODE_OFFSET_PARENT,
     NODE_OFFSET_POS,
+    NODE_OFFSET_VIRTUAL,
 } from "./protocol.ts";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -83,11 +88,21 @@ export function readSourceFileHash(data: DataView): string {
 
 /**
  * Read the per-file parse options key from a source file binary response.
- * This encodes the ExternalModuleIndicatorOptions bitmask as a string,
+ * This encodes the module-indicator and ETS annotation option bitmask as a string,
  * allowing the client to distinguish files parsed with different options.
  */
 export function readParseOptionsKey(data: DataView): string {
-    return data.getUint32(HEADER_OFFSET_PARSE_OPTIONS, true).toString();
+    return data.getUint32(HEADER_OFFSET_PARSE_OPTIONS, true).toString() + ":" + readEtsOptionsJson(data);
+}
+
+export function readEtsOptionsJson(data: DataView): string {
+    const index = data.getUint32(HEADER_OFFSET_ETS_OPTIONS, true);
+    if (index === 0xFFFFFFFF) return "{}";
+    const offsets = data.getUint32(HEADER_OFFSET_STRING_TABLE_OFFSETS, true) + index * 4;
+    const strings = data.getUint32(HEADER_OFFSET_STRING_TABLE, true);
+    const start = data.getUint32(offsets, true);
+    const end = data.getUint32(offsets + 4, true);
+    return new Wtf8Decoder().decode(new Uint8Array(data.buffer, data.byteOffset + strings + start, end - start));
 }
 
 function hex8(n: number): string {
@@ -138,6 +153,7 @@ export function modifierToFlag(kind: SyntaxKind): ModifierFlags {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export class RemoteNodeBase {
+    get virtual(): boolean { return this.view.getUint32(this._byteIndex + NODE_OFFSET_VIRTUAL, true) !== 0; }
     parent: any; // RemoteNode at runtime
     view: DataView;
     protected index: number;

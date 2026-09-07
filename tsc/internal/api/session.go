@@ -709,6 +709,8 @@ func (s *Session) HandleRequest(ctx context.Context, method string, params json.
 		return s.handleGetSourceFileNames(ctx, parsed.(*GetSourceFileNamesParams))
 	case string(MethodGetSourceFileMetadata):
 		return s.handleGetSourceFileMetadata(ctx, parsed.(*GetSourceFileParams))
+	case string(MethodGetProgramSourceGraph):
+		return s.handleGetProgramSourceGraph(ctx, parsed.(*GetSourceFileNamesParams))
 	case string(MethodGetConfigFileNames):
 		return s.handleGetConfigFileNames(ctx, parsed.(*GetProjectDiagnosticsParams))
 	case string(MethodGetConfigSourceFile):
@@ -875,6 +877,8 @@ func (s *Session) HandleRequest(ctx context.Context, method string, params json.
 		return s.handleGetImportAdderEdits(ctx, parsed.(*GetImportAdderEditsParams))
 	case string(MethodGetConstantValue):
 		return s.handleGetConstantValue(ctx, parsed.(*CheckerNodeParams))
+	case string(MethodGetAnnotationInfo):
+		return s.handleGetAnnotationInfo(ctx, parsed.(*CheckerNodeParams))
 	case string(MethodGetSignatureFromDeclaration):
 		return s.handleGetSignatureFromDeclaration(ctx, parsed.(*CheckerNodeParams))
 	case string(MethodGetExportSpecifierLocalTarget):
@@ -933,6 +937,8 @@ func (s *Session) HandleRequest(ctx context.Context, method string, params json.
 		return s.handleGetBindDiagnostics(ctx, parsed.(*GetDiagnosticsParams))
 	case string(MethodGetSemanticDiagnostics):
 		return s.handleGetSemanticDiagnostics(ctx, parsed.(*GetDiagnosticsParams))
+	case string(MethodGetArkTSLinterDiagnostics):
+		return s.handleGetArkTSLinterDiagnostics(ctx, parsed.(*GetDiagnosticsParams))
 	case string(MethodGetSuggestionDiagnostics):
 		return s.handleGetSuggestionDiagnostics(ctx, parsed.(*GetDiagnosticsParams))
 	case string(MethodGetDeclarationDiagnostics):
@@ -1695,6 +1701,58 @@ func (s *Session) handleGetSourceFileMetadata(ctx context.Context, params *GetSo
 		PackageJsonType:       metaData.PackageJsonType,
 		PackageJsonDirectory:  metaData.PackageJsonDirectory,
 		ImpliedNodeFormat:     metaData.ImpliedNodeFormat,
+	}, nil
+}
+
+// handleGetProgramSourceGraph returns the resolved implementation/declaration
+// graph in one request. The extension filter mirrors
+// ets2bundle/compiler/src/ets_checker.ts::createOrUpdateCache: JavaScript is a
+// graph leaf, while .ts/.ets (including declaration variants) are traversed.
+func (s *Session) handleGetProgramSourceGraph(ctx context.Context, params *GetSourceFileNamesParams) (*ProgramSourceGraph, error) {
+	sd, err := s.getSnapshotData(params.Snapshot)
+	if err != nil {
+		return nil, err
+	}
+
+	program, err := sd.getProgram(params.Project)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvedModules := program.GetResolvedModules()
+	files := program.GetSourceFiles()
+	graphFiles := make([]ProgramSourceGraphFile, len(files))
+	for index, file := range files {
+		dependencies := make([]string, 0, len(resolvedModules[file.Path()]))
+		for _, resolution := range resolvedModules[file.Path()] {
+			if resolution == nil || !resolution.IsResolved() ||
+				(!strings.HasSuffix(resolution.ResolvedFileName, ".ets") && !strings.HasSuffix(resolution.ResolvedFileName, ".ts")) {
+				continue
+			}
+			dependencies = append(dependencies, resolution.ResolvedFileName)
+		}
+		slices.Sort(dependencies)
+		dependencies = slices.Compact(dependencies)
+		graphFiles[index] = ProgramSourceGraphFile{
+			FileName:     file.FileName(),
+			Dependencies: dependencies,
+		}
+	}
+
+	typeReferenceFiles := make([]string, 0)
+	for _, resolutions := range program.GetResolvedTypeReferenceDirectives() {
+		for _, resolution := range resolutions {
+			if resolution != nil && resolution.IsResolved() {
+				typeReferenceFiles = append(typeReferenceFiles, resolution.ResolvedFileName)
+			}
+		}
+	}
+	slices.Sort(typeReferenceFiles)
+	typeReferenceFiles = slices.Compact(typeReferenceFiles)
+
+	return &ProgramSourceGraph{
+		Files:              graphFiles,
+		TypeReferenceFiles: typeReferenceFiles,
 	}, nil
 }
 
@@ -4003,6 +4061,16 @@ func (s *Session) handleGetBindDiagnostics(ctx context.Context, params *GetDiagn
 func (s *Session) handleGetSemanticDiagnostics(ctx context.Context, params *GetDiagnosticsParams) ([]*DiagnosticResponse, error) {
 	ctx = core.WithCheckerLifetime(ctx, core.CheckerLifetimeDiagnostics)
 	return s.getDiagnostics(ctx, params, (*compiler.Program).GetSemanticDiagnostics)
+}
+
+// handleGetArkTSLinterDiagnostics returns the independent ArkTS 1.1 linter
+// diagnostics produced by the strict linter checker. This mirrors
+// ArkTSLinter_1_1/LinterRunner.ts::runArkTSLinter rather than merging the
+// linter into ordinary TypeScript semantic diagnostics.
+// @gen-proto-nullable
+func (s *Session) handleGetArkTSLinterDiagnostics(ctx context.Context, params *GetDiagnosticsParams) ([]*DiagnosticResponse, error) {
+	ctx = core.WithCheckerLifetime(ctx, core.CheckerLifetimeDiagnostics)
+	return s.getDiagnostics(ctx, params, (*compiler.Program).GetArkTSLinterDiagnostics)
 }
 
 // @gen-proto-nullable

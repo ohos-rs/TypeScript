@@ -273,6 +273,8 @@ import {
 export class NodeObject {
     readonly kind: SyntaxKind;
     flags: NodeFlags = 0 as NodeFlags;
+    virtual: boolean = false;
+    parseOptions?: SourceFile["parseOptions"];
     readonly pos: number = -1;
     readonly end: number = -1;
     parent: Node = undefined!;
@@ -770,6 +772,8 @@ export function cloneNode<T extends Node>(node: T): T {
     const data = cloneNodeData(node);
     const clone = new NodeObject(node.kind, data);
     (clone as any).flags = node.flags;
+    clone.virtual = node.virtual ?? false;
+    if (node.kind === SyntaxKind.SourceFile) clone.parseOptions = (node as unknown as SourceFile).parseOptions;
     (clone as any).pos = node.pos;
     (clone as any).end = node.end;
     return clone as unknown as T;

@@ -332,11 +332,11 @@ export function getTokenPosOfNode(node: Node, sourceFile: SourceFile, includeJSD
     if (includeJSDoc && node.jsDoc && node.jsDoc.length > 0) {
         return getTokenPosOfNode(node.jsDoc[0], sourceFile, /*includeJSDoc*/ false);
     }
-    return skipTrivia(sourceFile.text, node.pos, /*stopAfterLineBreak*/ false, /*stopAtComments*/ false, /*inJSDoc*/ !!(node.flags & NodeFlags.JSDoc));
+    return node.virtual ? node.pos : skipTrivia(sourceFile.text, node.pos, /*stopAfterLineBreak*/ false, /*stopAtComments*/ false, /*inJSDoc*/ !!(node.flags & NodeFlags.JSDoc));
 }
 
 function nodeIsMissing(node: Node): boolean {
-    return node.pos === node.end && node.pos >= 0 && node.kind !== SyntaxKind.EndOfFile;
+    return !node.virtual && node.pos === node.end && node.pos >= 0 && node.kind !== SyntaxKind.EndOfFile;
 }
 
 function findPrecedingTokenImpl(sourceFile: SourceFile, position: number, startNode: Node): Node | undefined {

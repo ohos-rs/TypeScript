@@ -7,7 +7,7 @@ const n: number = "s";
 tsgo script
 ExitStatus:: DiagnosticsPresent_OutputsGenerated
 Output::
-[91merror[0m[90m TS6231: [0mCould not resolve the path 'script' with the extensions: '.ts', '.tsx', '.d.ts', '.cts', '.d.cts', '.mts', '.d.mts'.
+[91merror[0m[90m TS6231: [0mCould not resolve the path 'script' with the extensions: '.ts', '.tsx', '.d.ts', '.cts', '.d.cts', '.mts', '.d.mts', '.ets', '.d.ets'.
   The file is in the program because:
     Root file specified for compilation
 

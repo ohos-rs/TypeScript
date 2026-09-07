@@ -12,20 +12,18 @@ func IsStructDeclaration(node *Node) bool {
 	return node != nil && IsClassDeclaration(node) && node.Flags&NodeFlagsStruct != 0
 }
 
-func IsEtsComponentExpression(node *Node) bool {
-	return node != nil && IsCallExpression(node) && node.Flags&NodeFlagsEtsComponent != 0
+// OH binder.ts::bindAnnotationDeclaration uses class binding plus an annotation
+// identity. Share the class/member storage, never the ordinary class semantics.
+func IsAnnotationDeclaration(node *Node) bool {
+	return node != nil && IsClassDeclaration(node) && node.Flags&NodeFlagsAnnotation != 0
 }
 
-func ContainsArkUISyntax(file *SourceFile) bool {
-	if file.ScriptKind != core.ScriptKindETS {
-		return false
-	}
-	var visit Visitor
-	visit = func(node *Node) bool {
-		return IsStructDeclaration(node) || IsEtsComponentExpression(node) ||
-			IsArkUICompilerDecorator(node) || node.ForEachChild(visit)
-	}
-	return visit(file.AsNode())
+func IsAnnotationPropertyDeclaration(node *Node) bool {
+	return node != nil && IsPropertyDeclaration(node) && node.Flags&NodeFlagsAnnotation != 0
+}
+
+func IsEtsComponentExpression(node *Node) bool {
+	return node != nil && IsCallExpression(node) && node.Flags&NodeFlagsEtsComponent != 0
 }
 
 func HasArkUIDecorator(modifiers *ModifierList, names ...string) bool {
@@ -45,33 +43,96 @@ func HasArkUIDecorator(modifiers *ModifierList, names ...string) bool {
 	return false
 }
 
-// ArkUI annotations are interpreted by the ArkUI compiler, not as JavaScript
-// decorator calls. Keep this exception local to ETS and the supported targets.
-func IsArkUICompilerDecorator(decorator *Node) bool {
-	if !IsDecorator(decorator) || GetSourceFileOfNode(decorator).ScriptKind != core.ScriptKindETS {
-		return false
-	}
-	expr := decorator.Expression()
-	if IsCallExpression(expr) {
-		expr = expr.Expression()
-	}
-	if !IsIdentifier(expr) {
-		return false
-	}
-	name := expr.Text()
-	parent := decorator.Parent
-	switch parent.Kind {
-	case KindClassDeclaration:
-		if IsStructDeclaration(parent) {
-			return slices.Contains([]string{"Entry", "Component", "ComponentV2", "Reusable", "CustomDialog", "Preview"}, name)
+// OH hasEtsBuilderDecoratorNames/hasEtsStylesDecoratorNames inspect bare
+// identifiers. A call or a qualified name must not enable their DSL context.
+func HasArkUIBareDecorator(modifiers *ModifierList, names ...string) bool {
+	if modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if IsDecorator(modifier) && IsIdentifier(modifier.Expression()) && slices.Contains(names, modifier.Expression().Text()) {
+				return true
+			}
 		}
-		return slices.Contains([]string{"Observed", "ObservedV2", "Sendable"}, name)
-	case KindFunctionDeclaration:
-		return slices.Contains([]string{"Builder", "Styles", "Extend", "AnimatableExtend", "Concurrent"}, name)
-	case KindMethodDeclaration:
-		return slices.Contains([]string{"Builder", "LocalBuilder", "Styles", "Monitor", "Computed"}, name)
-	case KindPropertyDeclaration:
-		return slices.Contains([]string{"State", "Prop", "Link", "Provide", "Consume", "ObjectLink", "StorageLink", "StorageProp", "LocalStorageLink", "LocalStorageProp", "BuilderParam", "Watch", "Require", "Track", "Trace", "Local", "Param", "Once", "Event", "Provider", "Consumer"}, name)
 	}
 	return false
+}
+
+// OH ohApi.ts::isArkTsDecorator. This controls valid declaration targets,
+// never suppresses normal SDK decorator name/signature checking.
+func HasEtsDecorator(node *Node, options core.EtsOptions) bool {
+	for _, modifier := range node.ModifierNodes() {
+		if !IsDecorator(modifier) {
+			continue
+		}
+		expression := modifier.Expression()
+		if IsCallExpression(expression) && IsIdentifier(expression.Expression()) && options.Extend.Decorator.Contains(expression.Expression().Text()) {
+			return true
+		}
+		if IsIdentifier(expression) {
+			name := expression.Text()
+			if options.Render.Decorator.Contains(name) {
+				return true
+			}
+			if style, ok := options.Styles.Decorator.Get(); ok && style == name {
+				return true
+			}
+			if concurrent, ok := options.Concurrent.Decorator.Get(); ok && concurrent == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// IsEtsFunctionDecorator mirrors ohApi.ts::isEtsFunctionDecorators. The
+// concurrent decorator is intentionally excluded because OH only extends
+// function-decorator call semantics for render, Styles, and Extend.
+func IsEtsFunctionDecorator(decorator *Node, options core.EtsOptions) bool {
+	if !IsDecorator(decorator) {
+		return false
+	}
+	expression := decorator.Expression()
+	if IsCallExpression(expression) {
+		expression = expression.Expression()
+	}
+	if !IsIdentifier(expression) {
+		return false
+	}
+	name := expression.Text()
+	if options.Render.Decorator.Contains(name) || options.Extend.Decorator.Contains(name) {
+		return true
+	}
+	styles, present := options.Styles.Decorator.Get()
+	return present && styles == name
+}
+
+func HasEtsStylesDecorator(node *Node, options core.EtsOptions) bool {
+	name, present := options.Styles.Decorator.Get()
+	return present && HasArkUIBareDecorator(node.Modifiers(), name)
+}
+
+func IsEtsBuilder(node *Node, options core.EtsOptions) bool {
+	if options.Render.Decorator.IsZero() {
+		return HasArkUIBareDecorator(node.Modifiers(), "Builder", "LocalBuilder")
+	}
+	for name := range options.Render.Decorator.Values() {
+		if HasArkUIBareDecorator(node.Modifiers(), name) {
+			return true
+		}
+	}
+	return false
+}
+
+// OH isSendableFunctionOrType requires exactly one bare decorator in ETS.
+func IsSendableFunctionOrType(node *Node) bool {
+	if !(IsFunctionDeclaration(node) || IsTypeAliasDeclaration(node)) || GetSourceFileOfNode(node).ScriptKind != core.ScriptKindETS {
+		return false
+	}
+	count, sendable := 0, false
+	for _, modifier := range node.ModifierNodes() {
+		if IsDecorator(modifier) {
+			count++
+			sendable = IsIdentifier(modifier.Expression()) && modifier.Expression().Text() == "Sendable"
+		}
+	}
+	return count == 1 && sendable
 }

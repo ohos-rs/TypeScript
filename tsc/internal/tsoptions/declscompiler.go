@@ -918,6 +918,33 @@ var optionsForCompiler = []*CommandLineOption{
 
 	// Experimental
 	{
+		// OH commandLineParser.ts: default false, affects checking and emit.
+		Name:                       "etsAnnotationsEnable",
+		Kind:                       CommandLineOptionTypeBoolean,
+		AffectsSemanticDiagnostics: true,
+		AffectsEmit:                true,
+		AffectsBuildInfo:           true,
+		Category:                   diagnostics.Language_and_Environment,
+		Description:                diagnostics.Enable_support_of_ETS_annotations,
+		DefaultValueDescription:    false,
+	},
+	{
+		Name:                    "packageManagerType",
+		Kind:                    CommandLineOptionTypeString,
+		AffectsSourceFile:       true,
+		AffectsEmit:             true,
+		AffectsModuleResolution: true,
+		Category:                diagnostics.Language_and_Environment,
+		Description:             diagnostics.Unknown_build_option_0,
+	},
+	{
+		Name:                    "emitNodeModulesFiles",
+		Kind:                    CommandLineOptionTypeBoolean,
+		Category:                diagnostics.Language_and_Environment,
+		Description:             diagnostics.Unknown_build_option_0,
+		DefaultValueDescription: false,
+	},
+	{
 		Name:                       "experimentalDecorators",
 		Kind:                       CommandLineOptionTypeBoolean,
 		AffectsEmit:                true,

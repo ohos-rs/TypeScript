@@ -367,6 +367,7 @@ func (c *Checker) checkTypeRelatedToEx(
 	r.relation = relation
 	r.errorNode = errorNode
 	r.relationCount = (16_000_000 - relation.size()) / 8
+	r.strictVariance = c.compilerOptions.StrictCheckerOnly.IsTrue()
 	result := r.isRelatedToEx(source, target, RecursionFlagsBoth, errorNode != nil /*reportErrors*/, headMessage, IntersectionStateNone)
 	if r.overflow {
 		// Record this relation as having failed such that we don't attempt the overflowing operation again.
@@ -406,9 +407,17 @@ func createDiagnosticChainFromErrorChain(chain *ErrorChain, errorNode *ast.Node,
 	}
 	next := createDiagnosticChainFromErrorChain(chain.next, errorNode, relatedInfo)
 	if next == nil {
-		return NewDiagnosticForNode(errorNode, chain.message, chain.args...).SetRelatedInfo(relatedInfo)
+		diagnostic := NewDiagnosticForNode(errorNode, chain.message, chain.args...).SetRelatedInfo(relatedInfo)
+		if chain.filterFlag {
+			diagnostic.SetFilterFlag()
+		}
+		return diagnostic
 	}
-	return ast.NewDiagnosticChain(next, chain.message, chain.args...)
+	diagnostic := ast.NewDiagnosticChain(next, chain.message, chain.args...)
+	if chain.filterFlag {
+		diagnostic.SetFilterFlag()
+	}
+	return diagnostic
 }
 
 func (c *Checker) reportDiagnostic(diagnostic *ast.Diagnostic, diagnosticOutput *[]*ast.Diagnostic) {
@@ -2572,9 +2581,10 @@ type errorState struct {
 }
 
 type ErrorChain struct {
-	next    *ErrorChain
-	message *diagnostics.Message
-	args    []any
+	next       *ErrorChain
+	message    *diagnostics.Message
+	args       []any
+	filterFlag bool
 }
 
 type Relater struct {
@@ -2594,6 +2604,7 @@ type Relater struct {
 	overflow       bool
 	relationCount  int
 	next           *Relater
+	strictVariance bool
 }
 
 func (c *Checker) getRelater() *Relater {
@@ -4904,7 +4915,8 @@ func (r *Relater) reportError(message *diagnostics.Message, args ...any) {
 			return
 		}
 	}
-	r.errorChain = &ErrorChain{next: r.errorChain, message: message, args: args}
+	filterFlag := r.strictVariance && message == diagnostics.Type_0_is_not_assignable_to_type_1 && len(args) > 0 && args[0] == "unknown"
+	r.errorChain = &ErrorChain{next: r.errorChain, message: message, args: args, filterFlag: filterFlag}
 }
 
 func addToDottedName(head string, tail string) string {

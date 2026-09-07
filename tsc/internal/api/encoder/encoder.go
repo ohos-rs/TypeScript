@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
+	"github.com/microsoft/TypeScript/tsc/internal/json"
 	"github.com/microsoft/TypeScript/tsc/internal/spanmap"
 	"github.com/zeebo/xxh3"
 )
@@ -27,6 +28,7 @@ const (
 	NodeOffsetParent
 	NodeOffsetData
 	NodeOffsetFlags
+	NodeOffsetVirtual
 	// NodeSize is the number of bytes that represents a single node in the encoded format.
 	NodeSize
 )
@@ -59,11 +61,12 @@ const (
 	HeaderOffsetExtendedData
 	HeaderOffsetStructuredData
 	HeaderOffsetNodes
+	HeaderOffsetEtsOptions
 	HeaderSize
 )
 
 const (
-	ProtocolVersion uint8 = 9
+	ProtocolVersion uint8 = 10
 )
 
 // Source File Binary Format
@@ -79,14 +82,14 @@ const (
 //
 // | Section            | Length             | Description                                                                                     |
 // | ------------------ | ------------------ | ----------------------------------------------------------------------------------------------- |
-// | Header             | 44 bytes           | Contains the content hash, parse options, flags, and byte offsets to the start of each section. |
+// | Header             | 48 bytes           | Contains the content hash, parse options, flags, and byte offsets to the start of each section. |
 // | String offsets     | 8 bytes per string | Pairs of starting byte offsets and ending byte offsets into the **string data** section.        |
 // | String data        | variable           | UTF-8 encoded string data.                                                                      |
 // | Extended node data | variable           | Extra data for some kinds of nodes.                                                             |
 // | Structured data    | variable           | Msgpack-encoded metadata blobs (e.g. file references).                                         |
-// | Nodes              | 28 bytes per node  | Defines the AST structure of the file, with references to strings and extended data.            |
+// | Nodes              | 32 bytes per node  | Defines the AST structure of the file, with references to strings and extended data.            |
 //
-// Header (44 bytes)
+// Header (48 bytes)
 // -----------------
 //
 // The header contains the following fields:
@@ -96,12 +99,13 @@ const (
 // | 0           | uint8     | Protocol version                                  |
 // | 1-3         |           | Reserved                                          |
 // | 4-19        | uint128   | Source file content hash (xxh3, LE)               |
-// | 20-23       | uint32    | Parse options (bitmask; bit 0: JSX, bit 1: Force) |
+// | 20-23       | uint32    | Parse options (bit 0: JSX, bit 1: Force, bit 2: ETS annotations) |
 // | 24-27       | uint32    | Byte offset to string offsets section             |
 // | 28-31       | uint32    | Byte offset to string data section                |
 // | 32-35       | uint32    | Byte offset to extended node data section         |
 // | 36-39       | uint32    | Byte offset to structured data section            |
 // | 40-43       | uint32    | Byte offset to nodes section                      |
+// | 44-47       | uint32    | String-table uint32 index of serialized ETS options |
 //
 // String offsets (8 bytes per string)
 // -----------------------------------
@@ -179,7 +183,7 @@ const (
 //
 // An offset of 0xFFFFFFFF indicates no data (empty array).
 //
-// Nodes (28 bytes per node)
+// Nodes (32 bytes per node)
 // -------------------------
 //
 // The nodes section contains the AST structure of the file. Nodes are represented in a flat array in source order,
@@ -195,8 +199,9 @@ const (
 // | 16-20       | uint32 | Node index of parent       |
 // | 20-24       |        | Node data                  |
 // | 24-28       | uint32 | Node flags                 |
+// | 28-32       | uint32 | Virtual node marker        |
 //
-// The first 28 bytes of the nodes section are zeros representing a nil node, such that nodes without a parent or next
+// The first 32 bytes of the nodes section are zeros representing a nil node, such that nodes without a parent or next
 // sibling can unambiuously use `0` for those indices.
 //
 // NodeLists are represented as normal nodes with the special `kind` value `0xff_ff_ff_ff`. They are considered the parent
@@ -306,14 +311,17 @@ func SourceFileHash(sourceFile *ast.SourceFile) string {
 	return fmt.Sprintf("%016x%016x", h.Hi, h.Lo)
 }
 
-// encodeParseOptions encodes the per-file ExternalModuleIndicatorOptions as a uint32 bitmask.
-func encodeParseOptions(opts ast.ExternalModuleIndicatorOptions) uint32 {
+// encodeParseOptions preserves syntax-affecting options in the API cache key.
+func encodeParseOptions(opts ast.SourceFileParseOptions) uint32 {
 	var bits uint32
-	if opts.JSX {
+	if opts.ExternalModuleIndicatorOptions.JSX {
 		bits |= 1
 	}
-	if opts.Force {
+	if opts.ExternalModuleIndicatorOptions.Force {
 		bits |= 2
+	}
+	if opts.EtsAnnotationsEnable {
+		bits |= 4
 	}
 	return bits
 }
@@ -503,7 +511,7 @@ func encodeTree(rootNode *ast.Node, sourceFile *ast.SourceFile) ([]byte, *NodeIn
 					nodes[prevIndex*NodeSize+NodeOffsetNext+3] = b3
 				}
 
-				nodes = appendUint32s(nodes, SyntaxKindNodeList, utf16(nodeList.Pos()), utf16(nodeList.End()), 0, parentIndex, uint32(len(nodeList.Nodes)), uint32(boolToByte(nodeList.HasTrailingComma())))
+				nodes = appendUint32s(nodes, SyntaxKindNodeList, utf16(nodeList.Pos()), utf16(nodeList.End()), 0, parentIndex, uint32(len(nodeList.Nodes)), uint32(boolToByte(nodeList.HasTrailingComma())), 0)
 
 				saveParentIndex := parentIndex
 
@@ -536,7 +544,7 @@ func encodeTree(rootNode *ast.Node, sourceFile *ast.SourceFile) ([]byte, *NodeIn
 			nodes[prevIndex*NodeSize+NodeOffsetNext+3] = b3
 		}
 
-		nodes = appendUint32s(nodes, uint32(node.Kind), utf16(node.Pos()), utf16(node.End()), 0, parentIndex, getNodeData(node, strs, positionMap, &extendedData, &structuredData), uint32(node.Flags))
+		nodes = appendUint32s(nodes, uint32(node.Kind), utf16(node.Pos()), utf16(node.End()), 0, parentIndex, getNodeData(node, strs, positionMap, &extendedData, &structuredData), uint32(node.Flags), uint32(boolToByte(node.Virtual)))
 
 		if nodeIndexMap != nil {
 			if _, ok := nodeIndexMap[node]; ok {
@@ -560,14 +568,14 @@ func encodeTree(rootNode *ast.Node, sourceFile *ast.SourceFile) ([]byte, *NodeIn
 		return node
 	}
 
-	nodes = appendUint32s(nodes, 0, 0, 0, 0, 0, 0, 0)
+	nodes = appendUint32s(nodes, 0, 0, 0, 0, 0, 0, 0, 0)
 
 	nodeCount++
 	parentIndex++
 	nodeTable = append(nodeTable, rootNode) // index 1 = root node
 
 	sfExtendedDataOffset = len(extendedData)
-	nodes = appendUint32s(nodes, uint32(rootNode.Kind), utf16(rootNode.Pos()), utf16(rootNode.End()), 0, 0, getNodeData(rootNode, strs, positionMap, &extendedData, &structuredData), uint32(rootNode.Flags))
+	nodes = appendUint32s(nodes, uint32(rootNode.Kind), utf16(rootNode.Pos()), utf16(rootNode.End()), 0, 0, getNodeData(rootNode, strs, positionMap, &extendedData, &structuredData), uint32(rootNode.Flags), uint32(boolToByte(rootNode.Virtual)))
 
 	visitor.VisitEachChild(rootNode)
 	if sourceFile != nil {
@@ -580,7 +588,7 @@ func encodeTree(rootNode *ast.Node, sourceFile *ast.SourceFile) ([]byte, *NodeIn
 	var parseOpts uint32
 	if rootNode.Kind == ast.KindSourceFile {
 		hash = sourceFile.Hash
-		parseOpts = encodeParseOptions(sourceFile.ParseOptions().ExternalModuleIndicatorOptions)
+		parseOpts = encodeParseOptions(sourceFile.ParseOptions())
 
 		// Encode imports, moduleAugmentations, and ambientModuleNames into structured data,
 		// and patch the placeholder offsets in the SourceFile extended data.
@@ -604,6 +612,14 @@ func encodeTree(rootNode *ast.Node, sourceFile *ast.SourceFile) ([]byte, *NodeIn
 		binary.LittleEndian.PutUint32(extendedData[sfExtendedDataOffset+44:], externalModuleIndicatorIndex)
 	}
 
+	etsIndex := uint32(noStructuredData)
+	if ast.IsSourceFile(rootNode) {
+		data, err := json.Marshal(rootNode.AsSourceFile().ParseOptions().Ets)
+		if err != nil {
+			return nil, nil, err
+		}
+		etsIndex = strs.add(string(data), 0, 0, 0)
+	}
 	metadata := uint32(ProtocolVersion) << 24
 	offsetStringTableOffsets := HeaderSize
 	offsetStringTableData := HeaderSize + len(strs.offsets)*4
@@ -621,6 +637,7 @@ func encodeTree(rootNode *ast.Node, sourceFile *ast.SourceFile) ([]byte, *NodeIn
 		uint32(offsetExtendedData),
 		uint32(offsetStructuredData),
 		uint32(offsetNodes),
+		etsIndex,
 	}
 
 	var headerBytes, strsBytes []byte
