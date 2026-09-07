@@ -532,6 +532,8 @@ func GetScriptKindFromFileName(fileName string) ScriptKind {
 			return ScriptKindJS
 		case tspath.ExtensionJsx:
 			return ScriptKindJSX
+		case tspath.ExtensionEts:
+			return ScriptKindETS
 		case tspath.ExtensionTs, tspath.ExtensionCts, tspath.ExtensionMts:
 			return ScriptKindTS
 		case tspath.ExtensionTsx:
@@ -545,6 +547,8 @@ func GetScriptKindFromFileName(fileName string) ScriptKind {
 
 func GetDefaultExtensionForScriptKind(scriptKind ScriptKind) string {
 	switch scriptKind {
+	case ScriptKindETS:
+		return tspath.ExtensionEts
 	case ScriptKindJS:
 		return tspath.ExtensionJs
 	case ScriptKindJSX:

@@ -491,6 +491,7 @@ func createConstEqualsRequireDeclaration(changeTracker *change.Tracker, name *as
 						/*questionDotToken*/ nil,
 						/*typeArguments*/ nil,
 						changeTracker.NodeFactory.NewNodeList([]*ast.Node{quotedModuleSpecifier}),
+						nil,
 						ast.NodeFlagsNone,
 					),
 				),
@@ -1109,7 +1110,7 @@ func isIndexFileName(fileName string) bool {
 	}
 	fileName = fileName[lastSlash+1:]
 	switch fileName {
-	case "index.js", "index.jsx", "index.d.ts", "index.ts", "index.tsx":
+	case "index.js", "index.jsx", "index.d.ts", "index.ts", "index.tsx", "index.ets", "index.d.ets":
 		return true
 	}
 	return false

@@ -738,7 +738,7 @@ func (tx *esDecoratorTransformer) transformClassLike(node *ast.Node) *ast.Expres
 			constructorStatements := []*ast.Statement{}
 			if isDerivedClass {
 				spreadArguments := f.NewSpreadElement(f.NewIdentifier("arguments"))
-				superCall := f.NewCallExpression(f.NewKeywordExpression(ast.KindSuperKeyword), nil, nil, f.NewNodeList([]*ast.Expression{spreadArguments}), ast.NodeFlagsNone)
+				superCall := f.NewCallExpression(f.NewKeywordExpression(ast.KindSuperKeyword), nil, nil, f.NewNodeList([]*ast.Expression{spreadArguments}), nil, ast.NodeFlagsNone)
 				constructorStatements = append(constructorStatements, f.NewExpressionStatement(superCall))
 			}
 			constructorStatements = append(constructorStatements, initializerStatements...)
@@ -2662,6 +2662,7 @@ func (tx *esDecoratorTransformer) createMetadata(name *ast.IdentifierNode, class
 		f.NewPropertyAccessExpression(f.NewIdentifier("Object"), nil, f.NewIdentifier("create"), ast.NodeFlagsNone),
 		nil, nil,
 		f.NewNodeList([]*ast.Expression{superMetadata}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 
@@ -2701,6 +2702,7 @@ func (tx *esDecoratorTransformer) createSymbolMetadata(target *ast.Expression, v
 		f.NewPropertyAccessExpression(f.NewIdentifier("Object"), nil, f.NewIdentifier("defineProperty"), ast.NodeFlagsNone),
 		nil, nil,
 		f.NewNodeList([]*ast.Expression{target, symbolMetadata, descriptor}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 

@@ -1300,7 +1300,7 @@ func (tx *classFieldsTransformer) visitCallExpression(node *ast.CallExpression) 
 				nil, /*questionDotToken*/
 				nil, /*typeArguments*/
 				tx.Factory().NewNodeList(allArgs),
-				node.Flags,
+				node.EtsBody, node.Flags,
 			)
 		}
 		return tx.Factory().UpdateCallExpression(
@@ -1309,7 +1309,7 @@ func (tx *classFieldsTransformer) visitCallExpression(node *ast.CallExpression) 
 			nil, /*questionDotToken*/
 			nil, /*typeArguments*/
 			tx.Factory().NewNodeList(allArgs),
-			node.Flags,
+			node.EtsBody, node.Flags,
 		)
 	}
 
@@ -1345,6 +1345,7 @@ func (tx *classFieldsTransformer) visitTaggedTemplateExpression(node *ast.Tagged
 			nil, /*questionDotToken*/
 			nil, /*typeArguments*/
 			tx.Factory().NewNodeList([]*ast.Node{tx.Visitor().VisitNode(thisArg)}),
+			nil,
 			ast.NodeFlagsNone,
 		)
 		return tx.Factory().UpdateTaggedTemplateExpression(
@@ -2299,7 +2300,7 @@ func (tx *classFieldsTransformer) transformClassMembers(node *ast.Node) (members
 			)
 			prologue = tx.Factory().NewAssignmentExpression(temp, arrow)
 			statement = tx.Factory().NewExpressionStatement(
-				tx.Factory().NewCallExpression(temp, nil /*questionDotToken*/, nil /*typeArguments*/, tx.Factory().NewNodeList(nil), ast.NodeFlagsNone),
+				tx.Factory().NewCallExpression(temp, nil /*questionDotToken*/, nil /*typeArguments*/, tx.Factory().NewNodeList(nil), nil, ast.NodeFlagsNone),
 			)
 		}
 
@@ -2597,6 +2598,7 @@ func (tx *classFieldsTransformer) transformConstructorBody(container *ast.Node, 
 					tx.Factory().NewNodeList([]*ast.Node{
 						tx.Factory().NewSpreadElement(tx.Factory().NewIdentifier("arguments")),
 					}),
+					nil,
 					ast.NodeFlagsNone,
 				),
 			)

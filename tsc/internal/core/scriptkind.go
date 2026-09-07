@@ -17,4 +17,6 @@ const (
 	ScriptKindJSON ScriptKind = 6
 
 	// Value 7 is reserved (formerly ScriptKindDeferred).
+	// ScriptKindETS selects ArkTS 1.1 / ArkUI; it does not enable static ETS.
+	ScriptKindETS ScriptKind = 8
 )

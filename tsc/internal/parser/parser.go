@@ -64,8 +64,13 @@ const (
 )
 
 type Parser struct {
-	scanner *scanner.Scanner
-	factory ast.NodeFactory
+	arkUIStruct     bool
+	arkUI           bool
+	arkUIStyles     bool
+	arkUIExpression bool
+	arkUICallback   bool
+	scanner         *scanner.Scanner
+	factory         ast.NodeFactory
 
 	opts       ast.SourceFileParseOptions
 	sourceText string
@@ -1061,6 +1066,9 @@ func (p *Parser) parseOptionalTokenJSDoc(kind ast.Kind) *ast.Node {
 }
 
 func (p *Parser) parseStatement() *ast.Statement {
+	if p.isStructDeclaration() {
+		return p.parseClassDeclaration(p.nodePos(), p.jsdocScannerInfo(), nil)
+	}
 	switch p.token {
 	case ast.KindSemicolonToken:
 		return p.parseEmptyStatement()
@@ -1149,6 +1157,9 @@ func (p *Parser) parseDeclaration() *ast.Statement {
 }
 
 func (p *Parser) parseDeclarationWorker(pos int, jsdoc jsdocScannerInfo, modifiers *ast.ModifierList) *ast.Statement {
+	if p.isStructDeclaration() {
+		return p.parseClassDeclaration(pos, jsdoc, modifiers)
+	}
 	switch p.token {
 	case ast.KindVarKeyword, ast.KindLetKeyword, ast.KindConstKeyword, ast.KindUsingKeyword:
 		return p.parseVariableStatement(pos, jsdoc, modifiers)
@@ -1463,7 +1474,7 @@ func (p *Parser) parseThrowStatement() *ast.Node {
 	} else {
 		expression = p.createMissingIdentifier()
 	}
-	if !p.tryParseSemicolon() {
+	if !p.tryParseSemicolon() && !hasArkUIBody(expression) {
 		p.parseErrorForMissingSemicolonAfter(expression)
 	}
 	result := p.finishNode(p.factory.NewThrowStatement(expression), pos)
@@ -1523,7 +1534,10 @@ func (p *Parser) parseExpressionOrLabeledStatement() *ast.Statement {
 	pos := p.nodePos()
 	jsdoc := p.jsdocScannerInfo()
 	hasParen := p.token == ast.KindOpenParenToken
+	savedExpression := p.arkUIExpression
+	p.arkUIExpression = p.arkUI
 	expression := p.parseExpression()
+	p.arkUIExpression = savedExpression
 
 	if expression.Kind == ast.KindIdentifier && p.parseOptional(ast.KindColonToken) {
 		result := p.finishNode(p.factory.NewLabeledStatement(expression, p.parseStatement()), pos)
@@ -1728,7 +1742,7 @@ func (p *Parser) parseFunctionDeclaration(pos int, jsdoc jsdocScannerInfo, modif
 	}
 	parameters := p.parseParameters(signatureFlags)
 	returnType := p.parseReturnType(ast.KindColonToken, false /*isType*/)
-	body := p.parseFunctionBlockOrSemicolon(signatureFlags, diagnostics.X_or_expected)
+	body := p.parseArkUIFunctionBody(signatureFlags, diagnostics.X_or_expected, modifiers, false)
 	p.contextFlags = saveContextFlags
 	result := p.finishNode(p.factory.NewFunctionDeclaration(modifiers, asteriskToken, name, typeParameters, parameters, returnType, nil /*fullSignature*/, body), pos)
 	p.withJSDoc(result, jsdoc)
@@ -1747,7 +1761,15 @@ func (p *Parser) parseClassExpression() *ast.Node {
 func (p *Parser) parseClassDeclarationOrExpression(pos int, jsdoc jsdocScannerInfo, modifiers *ast.ModifierList, kind ast.Kind) *ast.Node {
 	saveContextFlags := p.contextFlags
 	saveHasAwaitIdentifier := p.statementHasAwaitIdentifier
-	p.parseExpected(ast.KindClassKeyword)
+	isStruct := p.isStructDeclaration()
+	savedStruct := p.arkUIStruct
+	p.arkUIStruct = isStruct
+	defer func() { p.arkUIStruct = savedStruct }()
+	if isStruct {
+		p.nextToken()
+	} else {
+		p.parseExpected(ast.KindClassKeyword)
+	}
 	// We don't parse the name here in await context, instead we will report a grammar error in the checker.
 	name := p.parseNameOfClassDeclarationOrExpression()
 	typeParameters := p.parseTypeParameters()
@@ -1776,6 +1798,9 @@ func (p *Parser) parseClassDeclarationOrExpression(pos int, jsdoc jsdocScannerIn
 		result = p.factory.NewClassDeclaration(modifiers, name, typeParameters, heritageClauses, members)
 	} else {
 		result = p.factory.NewClassExpression(modifiers, name, typeParameters, heritageClauses, members)
+	}
+	if isStruct {
+		result.Flags |= ast.NodeFlagsStruct
 	}
 	p.finishNode(result, pos)
 	p.withJSDoc(result, jsdoc)
@@ -2001,7 +2026,7 @@ func (p *Parser) parseMethodDeclaration(pos int, jsdoc jsdocScannerInfo, modifie
 	typeParameters := p.parseTypeParameters()
 	parameters := p.parseParameters(signatureFlags)
 	typeNode := p.parseReturnType(ast.KindColonToken, false /*isType*/)
-	body := p.parseFunctionBlockOrSemicolon(signatureFlags, diagnosticMessage)
+	body := p.parseArkUIFunctionBody(signatureFlags, diagnosticMessage, modifiers, p.arkUIStruct && name.Kind == ast.KindIdentifier && name.Text() == "build")
 	result := p.finishNode(p.factory.NewMethodDeclaration(modifiers, asteriskToken, name, questionToken, typeParameters, parameters, typeNode, nil /*fullSignature*/, body), pos)
 	p.withJSDoc(result, jsdoc)
 	p.checkJSSyntax(result)
@@ -4038,7 +4063,11 @@ func (p *Parser) nextTokenCanFollowModifier() bool {
 }
 
 func (p *Parser) nextTokenCanFollowDefaultKeyword() bool {
-	switch p.nextToken() {
+	p.nextToken()
+	if p.isStructDeclaration() {
+		return true
+	}
+	switch p.token {
 	case ast.KindClassKeyword, ast.KindFunctionKeyword, ast.KindInterfaceKeyword, ast.KindAtToken:
 		return true
 	case ast.KindAbstractKeyword:
@@ -4513,6 +4542,9 @@ func typeHasArrowFunctionBlockingParseError(node *ast.TypeNode) bool {
 }
 
 func (p *Parser) parseArrowFunctionExpressionBody(isAsync bool, allowReturnTypeInArrowFunction bool) *ast.Node {
+	savedUI, savedStyles := p.arkUI, p.arkUIStyles
+	p.arkUI, p.arkUIStyles = p.arkUICallback, false
+	defer func() { p.arkUI, p.arkUIStyles = savedUI, savedStyles }()
 	if p.token == ast.KindOpenBraceToken {
 		return p.parseFunctionBlock(core.IfElse(isAsync, ParseFlagsAwait, ParseFlagsNone), nil /*diagnosticMessage*/)
 	}
@@ -5521,9 +5553,24 @@ func (p *Parser) parseCallExpressionRest(pos int, expression *ast.Expression) *a
 				expression = expression.AsExpressionWithTypeArguments().Expression
 			}
 			inner := expression
-			argumentList := p.parseArgumentList()
+			isComponent := p.arkUIExpression && questionDotToken == nil && isArkUIComponentName(expression)
+			savedExpression, savedCallback, savedStyles := p.arkUIExpression, p.arkUICallback, p.arkUIStyles
+			p.arkUIExpression = false
+			p.arkUICallback = p.arkUI && isArkUIIteration(expression)
+			if p.arkUI && ast.IsPropertyAccessExpression(expression) && expression.Name().Text() == "stateStyles" {
+				p.arkUIStyles = true
+			}
+			argumentList := p.parseArkUIArgumentList(expression)
+			p.arkUIExpression, p.arkUICallback, p.arkUIStyles = savedExpression, savedCallback, savedStyles
+			var etsBody *ast.Node
+			if isComponent && p.token == ast.KindOpenBraceToken {
+				etsBody = p.parseBlock(false, nil)
+			}
 			isOptionalChain := questionDotToken != nil || p.tryReparseOptionalChain(expression)
-			expression = p.checkJSSyntax(p.finishNode(p.factory.NewCallExpression(expression, questionDotToken, typeArguments, argumentList, core.IfElse(isOptionalChain, ast.NodeFlagsOptionalChain, ast.NodeFlagsNone)), pos))
+			expression = p.checkJSSyntax(p.finishNode(p.factory.NewCallExpression(expression, questionDotToken, typeArguments, argumentList, etsBody, core.IfElse(isOptionalChain, ast.NodeFlagsOptionalChain, ast.NodeFlagsNone)), pos))
+			if isComponent {
+				expression.Flags |= ast.NodeFlagsEtsComponent
+			}
 			p.unparseExpressionWithTypeArguments(inner, typeArguments, expression)
 			continue
 		}
@@ -5604,6 +5651,30 @@ func (p *Parser) parseTemplateSpan(isTaggedTemplate bool) *ast.Node {
 }
 
 func (p *Parser) parsePrimaryExpression() *ast.Expression {
+	if p.scriptKind == core.ScriptKindETS && p.arkUI && p.token == ast.KindIdentifier {
+		text := p.scanner.TokenValue()
+		if len(text) > 1 && text[0] == '$' {
+			node := p.parseIdentifier()
+			node.Flags |= ast.NodeFlagsEtsBinding
+			return node
+		}
+	}
+	if p.arkUIStyles && p.token == ast.KindOpenBraceToken && p.lookAhead(func(p *Parser) bool { return p.nextToken() == ast.KindDotToken }) {
+		pos := p.nodePos()
+		parameters := p.factory.NewNodeList(nil)
+		parameters.Loc = core.NewTextRange(pos, pos)
+		arrow := p.factory.NewToken(ast.KindEqualsGreaterThanToken)
+		arrow.Loc = core.NewTextRange(pos, pos)
+		body := p.parseBlock(false, nil)
+		node := p.finishNode(p.factory.NewArrowFunction(nil, nil, parameters, nil, nil, arrow, body), pos)
+		node.Flags |= ast.NodeFlagsEtsStylesBlock
+		return node
+	}
+	if p.scriptKind == core.ScriptKindETS && p.arkUIStyles && p.token == ast.KindDotToken {
+		result := p.finishNode(p.factory.NewKeywordExpression(ast.KindThisKeyword), p.nodePos())
+		result.Flags |= ast.NodeFlagsEtsImplicitReceiver
+		return result
+	}
 	switch p.token {
 	case ast.KindNoSubstitutionTemplateLiteral:
 		if p.scanner.TokenFlags()&ast.TokenFlagsIsInvalid != 0 {
@@ -5761,7 +5832,7 @@ func (p *Parser) parseFunctionExpression() *ast.Expression {
 	typeParameters := p.parseTypeParameters()
 	parameters := p.parseParameters(signatureFlags)
 	returnType := p.parseReturnType(ast.KindColonToken, false /*isType*/)
-	body := p.parseFunctionBlock(signatureFlags, nil /*diagnosticMessage*/)
+	body := p.parseArkUIFunctionBody(signatureFlags, nil, nil, false)
 	p.contextFlags = saveContexFlags
 	result := p.factory.NewFunctionExpression(modifiers, asteriskToken, name, typeParameters, parameters, returnType, nil /*fullSignature*/, body)
 	p.finishNode(result, pos)
@@ -6126,6 +6197,9 @@ func (p *Parser) isStartOfDeclaration() bool {
 
 func (p *Parser) scanStartOfDeclaration() bool {
 	for {
+		if p.isStructDeclaration() {
+			return true
+		}
 		switch p.token {
 		case ast.KindVarKeyword, ast.KindLetKeyword, ast.KindConstKeyword, ast.KindFunctionKeyword, ast.KindClassKeyword,
 			ast.KindEnumKeyword:
@@ -6222,6 +6296,9 @@ func (p *Parser) isStartOfExpression() bool {
 }
 
 func (p *Parser) isStartOfLeftHandSideExpression() bool {
+	if p.arkUIStyles && p.token == ast.KindDotToken {
+		return true
+	}
 	switch p.token {
 	case ast.KindThisKeyword, ast.KindSuperKeyword, ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword,
 		ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateHead,

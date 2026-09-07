@@ -338,5 +338,9 @@
     "Diagnostic directive {0} returned by the content mapper has an invalid 'unusedExpectDirectiveIndex'.": {
         "category": "Message",
         "code": 100068
+    },
+    "ArkUI JavaScript emit requires the OpenHarmony SDK compiler. Use noEmit or emitDeclarationOnly.": {
+        "category": "Error",
+        "code": 100069
     }
 }

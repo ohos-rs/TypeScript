@@ -148,7 +148,7 @@ func (s *superAccessState) substituteCallExpressionWithSuperAccess(call *ast.Cal
 
 	result := s.factory.NewCallExpression(
 		callTarget, nil, nil,
-		s.factory.NewNodeList(allArgs), ast.NodeFlagsNone,
+		s.factory.NewNodeList(allArgs), nil, ast.NodeFlagsNone,
 	)
 	result.Loc = call.Loc
 	return result
@@ -159,6 +159,7 @@ func (s *superAccessState) createSuperElementAccessInAsyncMethod(argumentExpress
 	superIndexCall := s.factory.NewCallExpression(
 		s.superIndexBinding, nil, nil,
 		s.factory.NewNodeList([]*ast.Node{argumentExpression}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 	if s.hasSuperPropertyAssignment {
@@ -236,6 +237,7 @@ func (s *superAccessState) createSuperAccessVariableStatement() *ast.Node {
 			f.NewKeywordExpression(ast.KindNullKeyword),
 			descriptorsObject,
 		}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 

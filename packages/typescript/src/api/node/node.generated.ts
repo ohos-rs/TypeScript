@@ -688,6 +688,9 @@ export class RemoteNode extends RemoteNodeBase implements Node {
     get equalsToken(): RemoteNode | undefined {
         return this.getNamedChild("equalsToken") as RemoteNode;
     }
+    get etsBody(): RemoteNode | undefined {
+        return this.getNamedChild("etsBody") as RemoteNode;
+    }
     get exclamationToken(): RemoteNode | undefined {
         return this.getNamedChild("exclamationToken") as RemoteNode;
     }

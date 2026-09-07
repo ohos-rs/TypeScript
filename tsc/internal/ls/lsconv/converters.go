@@ -291,6 +291,8 @@ func virtualPositionToOriginal(script Script, position core.TextPos, feature *sp
 
 func LanguageKindToScriptKind(languageID lsproto.LanguageKind) core.ScriptKind {
 	switch languageID {
+	case "ets", "arkts":
+		return core.ScriptKindETS
 	case "typescript":
 		return core.ScriptKindTS
 	case "typescriptreact":

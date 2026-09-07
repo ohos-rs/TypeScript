@@ -31,6 +31,9 @@ export enum NodeFlags {
     PossiblyContainsDeprecatedTag = 1 << 26,
     Unreachable = 1 << 27,
     ReparserTransformedLiteral = 1 << 28,
+    Struct = 1 << 29,
+    EtsComponent = 1 << 30,
+    EtsImplicitReceiver = 1 << 31,
     BlockScoped = Let | Const | Using,
     Constant = Const | Using,
     AwaitUsing = Const | Using,
@@ -41,5 +44,7 @@ export enum NodeFlags {
     PermanentlySetIncrementalFlags = PossiblyContainsDynamicImport | PossiblyContainsImportMeta,
     IdentifierHasExtendedUnicodeEscape = ContainsThis,
     IdentifierIsInJSDocNamespace = HasAsyncFunctions,
+    EtsBinding = Struct,
+    EtsStylesBlock = Struct,
     NestedNamespace = OptionalChain,
 }

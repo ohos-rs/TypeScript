@@ -870,6 +870,7 @@ func TestParenthesizeCall1(t *testing.T) {
 					nil, /*questionDotToken*/
 					nil, /*typeArguments*/
 					factory.NewNodeList([]*ast.Node{}),
+					nil,
 					ast.NodeFlagsNone,
 				),
 			),
@@ -898,6 +899,7 @@ func TestParenthesizeCall2(t *testing.T) {
 					nil, /*questionDotToken*/
 					nil, /*typeArguments*/
 					factory.NewNodeList([]*ast.Node{}),
+					nil,
 					ast.NodeFlagsNone,
 				),
 			),
@@ -925,6 +927,7 @@ func TestParenthesizeCall3(t *testing.T) {
 					nil, /*questionDotToken*/
 					nil, /*typeArguments*/
 					factory.NewNodeList([]*ast.Node{}),
+					nil,
 					ast.NodeFlagsNone,
 				),
 			),
@@ -955,6 +958,7 @@ func TestParenthesizeCall4(t *testing.T) {
 							factory.NewIdentifier("c"),
 						),
 					}),
+					nil,
 					ast.NodeFlagsNone,
 				),
 			),
@@ -1006,6 +1010,7 @@ func TestParenthesizeNew2(t *testing.T) {
 						nil, /*questionDotToken*/
 						nil, /*typeArguments*/
 						factory.NewNodeList([]*ast.Node{}),
+						nil,
 						ast.NodeFlagsNone,
 					),
 					nil, /*typeArguments*/
@@ -1680,6 +1685,7 @@ func TestParenthesizeSpreadElement2(t *testing.T) {
 							),
 						},
 					),
+					nil,
 					ast.NodeFlagsNone,
 				),
 			),

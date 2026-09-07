@@ -2129,7 +2129,7 @@ func (node *ElementAccessExpression) propagateSubtreeFacts() SubtreeFacts {
 }
 
 func (node *CallExpression) computeSubtreeFacts() SubtreeFacts {
-	return propagateSubtreeFacts(node.Expression) |
+	return propagateSubtreeFacts(node.EtsBody) | propagateSubtreeFacts(node.Expression) |
 		propagateSubtreeFacts(node.QuestionDotToken) |
 		propagateEraseableSyntaxListSubtreeFacts(node.TypeArguments) |
 		propagateNodeListSubtreeFacts(node.Arguments, propagateSubtreeFacts) |

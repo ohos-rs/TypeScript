@@ -190,6 +190,12 @@ func (e *emitter) emitJSFile(sourceFile *ast.SourceFile, jsFilePath string, sour
 		return
 	}
 
+	if ast.ContainsArkUISyntax(sourceFile) {
+		e.emitResult.EmitSkipped = true
+		e.emitterDiagnostics.Add(ast.NewDiagnostic(sourceFile, core.NewTextRange(0, 0), diagnostics.ArkUI_JavaScript_emit_requires_the_OpenHarmony_SDK_compiler_Use_noEmit_or_emitDeclarationOnly))
+		return
+	}
+
 	if e.tr != nil {
 		defer e.tr.Push(tracing.PhaseEmit, "emitJsFileOrBundle", map[string]any{"jsFilePath": jsFilePath}, true)()
 	}

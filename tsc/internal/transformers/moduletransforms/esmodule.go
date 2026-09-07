@@ -283,7 +283,7 @@ func (tx *ESModuleTransformer) visitImportOrRequireCall(node *ast.CallExpression
 		node.QuestionDotToken,
 		nil, /*typeArguments*/
 		argumentList,
-		node.Flags,
+		node.EtsBody, node.Flags,
 	)
 }
 
@@ -301,6 +301,7 @@ func (tx *ESModuleTransformer) createRequireCall(node *ast.Node /*ImportDeclarat
 			nil, /*questionDotToken*/
 			nil, /*typeArguments*/
 			tx.Factory().NewNodeList(args),
+			nil,
 			ast.NodeFlagsNone,
 		)
 	}
@@ -348,6 +349,7 @@ func (tx *ESModuleTransformer) createRequireCall(node *ast.Node /*ImportDeclarat
 									ast.NodeFlagsNone,
 								),
 							}),
+							nil,
 							ast.NodeFlagsNone,
 						),
 					),
@@ -367,6 +369,7 @@ func (tx *ESModuleTransformer) createRequireCall(node *ast.Node /*ImportDeclarat
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		tx.Factory().NewNodeList(args),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }

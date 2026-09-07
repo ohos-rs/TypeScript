@@ -239,7 +239,7 @@ func (c *Checker) checkGrammarModifiers(node *ast.Node /*Union[HasModifiers, Has
 	modifiers := node.ModifierNodes()
 	for _, modifier := range modifiers {
 		if ast.IsDecorator(modifier) {
-			if !ast.NodeCanBeDecorated(c.legacyDecorators, node, node.Parent, node.Parent.Parent) {
+			if !ast.IsArkUICompilerDecorator(modifier) && !ast.NodeCanBeDecorated(c.legacyDecorators, node, node.Parent, node.Parent.Parent) {
 				if node.Kind == ast.KindMethodDeclaration && !ast.NodeIsPresent(node.Body()) {
 					return c.grammarErrorOnFirstToken(node, diagnostics.A_decorator_can_only_decorate_a_method_implementation_not_an_overload)
 				} else {
@@ -649,7 +649,7 @@ func (c *Checker) reportObviousDecoratorErrors(node *ast.Node) bool {
 
 func (c *Checker) findFirstIllegalDecorator(node *ast.Node) *ast.Node {
 	if ast.CanHaveIllegalDecorators(node) {
-		decorator := core.Find(node.ModifierNodes(), ast.IsDecorator)
+		decorator := core.Find(node.ModifierNodes(), func(n *ast.Node) bool { return ast.IsDecorator(n) && !ast.IsArkUICompilerDecorator(n) })
 		return decorator
 	} else {
 		return nil

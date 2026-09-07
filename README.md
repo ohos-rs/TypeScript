@@ -1,6 +1,8 @@
 
 # TypeScript
 
+ArkTS 1.1 / ArkUI support on the `ohos` branch is documented in [docs/arkts.md](docs/arkts.md).
+
 [![CI](https://github.com/microsoft/TypeScript/actions/workflows/ci.yml/badge.svg)](https://github.com/microsoft/TypeScript/actions/workflows/ci.yml)
 [![npm version](https://badge.fury.io/js/typescript.svg)](https://www.npmjs.com/package/typescript)
 [![Downloads](https://img.shields.io/npm/dm/typescript.svg)](https://www.npmjs.com/package/typescript)

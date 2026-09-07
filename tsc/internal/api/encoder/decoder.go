@@ -287,7 +287,12 @@ func (d *astDecoder) decodeExtendedData_SourceFile(data uint32, childIndices []i
 	if endOfFile == nil {
 		endOfFile = d.factory.NewToken(ast.KindEndOfFile)
 	}
-	return d.factory.NewSourceFile(opts, text, stmts, endOfFile), nil
+	node := d.factory.NewSourceFile(opts, text, stmts, endOfFile)
+	file := node.AsSourceFile()
+	file.LanguageVariant = core.LanguageVariant(readLE32(d.raw, extOff+12))
+	file.ScriptKind = core.ScriptKind(readLE32(d.raw, extOff+16))
+	file.IsDeclarationFile = tspath.IsDeclarationFileName(fileName)
+	return node, nil
 }
 
 func (d *astDecoder) decodeExtendedData_TemplateHead(data uint32, childIndices []int, commonData uint8) (*ast.Node, error) {

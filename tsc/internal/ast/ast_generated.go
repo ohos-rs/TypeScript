@@ -4261,22 +4261,24 @@ type CallExpression struct {
 	QuestionDotToken *QuestionDotToken // Optional
 	TypeArguments    *TypeList         // Optional
 	Arguments        *ElementList
+	EtsBody          *BlockNode // Optional
 }
 
-func (f *NodeFactory) NewCallExpression(expression *Expression, questionDotToken *QuestionDotToken, typeArguments *TypeList, arguments *ElementList, flags NodeFlags) *Node {
+func (f *NodeFactory) NewCallExpression(expression *Expression, questionDotToken *QuestionDotToken, typeArguments *TypeList, arguments *ElementList, etsBody *BlockNode, flags NodeFlags) *Node {
 	data := f.callExpressionArena.New()
 	data.Expression = expression
 	data.QuestionDotToken = questionDotToken
 	data.TypeArguments = typeArguments
 	data.Arguments = arguments
+	data.EtsBody = etsBody
 	node := f.newNode(KindCallExpression, data)
 	node.Flags |= flags & NodeFlagsOptionalChain
 	return node
 }
 
-func (f *NodeFactory) UpdateCallExpression(node *CallExpression, expression *Expression, questionDotToken *QuestionDotToken, typeArguments *TypeList, arguments *ElementList, flags NodeFlags) *Node {
-	if expression != node.Expression || questionDotToken != node.QuestionDotToken || typeArguments != node.TypeArguments || arguments != node.Arguments || flags != node.Flags {
-		return updateNode(f.NewCallExpression(expression, questionDotToken, typeArguments, arguments, flags), node.AsNode(), f.hooks)
+func (f *NodeFactory) UpdateCallExpression(node *CallExpression, expression *Expression, questionDotToken *QuestionDotToken, typeArguments *TypeList, arguments *ElementList, etsBody *BlockNode, flags NodeFlags) *Node {
+	if expression != node.Expression || questionDotToken != node.QuestionDotToken || typeArguments != node.TypeArguments || arguments != node.Arguments || etsBody != node.EtsBody || flags != node.Flags {
+		return updateNode(f.NewCallExpression(expression, questionDotToken, typeArguments, arguments, etsBody, flags), node.AsNode(), f.hooks)
 	}
 	return node.AsNode()
 }
@@ -4285,15 +4287,16 @@ func (node *CallExpression) ForEachChild(v Visitor) bool {
 	return visit(v, node.Expression) ||
 		visit(v, node.QuestionDotToken) ||
 		visitNodeList(v, node.TypeArguments) ||
-		visitNodeList(v, node.Arguments)
+		visitNodeList(v, node.Arguments) ||
+		visit(v, node.EtsBody)
 }
 
 func (node *CallExpression) VisitEachChild(v *NodeVisitor) *Node {
-	return v.Factory.UpdateCallExpression(node, v.visitNode(node.Expression), v.visitNode(node.QuestionDotToken), v.visitNodes(node.TypeArguments), v.visitNodes(node.Arguments), node.Flags)
+	return v.Factory.UpdateCallExpression(node, v.visitNode(node.Expression), v.visitNode(node.QuestionDotToken), v.visitNodes(node.TypeArguments), v.visitNodes(node.Arguments), v.visitNode(node.EtsBody), node.Flags)
 }
 
 func (node *CallExpression) Clone(f NodeFactoryCoercible) *Node {
-	return cloneNode(f.AsNodeFactory().NewCallExpression(node.Expression, node.QuestionDotToken, node.TypeArguments, node.Arguments, node.Flags), node.AsNode(), f.AsNodeFactory().hooks)
+	return cloneNode(f.AsNodeFactory().NewCallExpression(node.Expression, node.QuestionDotToken, node.TypeArguments, node.Arguments, node.EtsBody, node.Flags), node.AsNode(), f.AsNodeFactory().hooks)
 }
 
 func IsCallExpression(node *Node) bool {

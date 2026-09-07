@@ -999,7 +999,7 @@ func countFileStats(sourceFiles []*ast.SourceFile) *lsproto.ProjectInfoTelemetry
 		case core.ScriptKindJSX:
 			stats.JsxFileCount++
 			stats.JsxFileSize += size
-		case core.ScriptKindTS:
+		case core.ScriptKindTS, core.ScriptKindETS:
 			if tspath.IsDeclarationFileName(sf.FileName()) {
 				stats.DtsFileCount++
 				stats.DtsFileSize += size

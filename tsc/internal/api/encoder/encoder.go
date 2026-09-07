@@ -63,7 +63,7 @@ const (
 )
 
 const (
-	ProtocolVersion uint8 = 8
+	ProtocolVersion uint8 = 9
 )
 
 // Source File Binary Format

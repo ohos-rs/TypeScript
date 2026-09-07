@@ -360,6 +360,7 @@ func (f *NodeFactory) NewMethodCall(object *ast.Node, methodName *ast.Node, argu
 			nil,
 			nil,
 			f.NewNodeList(argumentsList),
+			nil,
 			ast.NodeFlagsOptionalChain,
 		)
 	}
@@ -368,6 +369,7 @@ func (f *NodeFactory) NewMethodCall(object *ast.Node, methodName *ast.Node, argu
 		nil,
 		nil,
 		f.NewNodeList(argumentsList),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -616,6 +618,7 @@ func (f *NodeFactory) NewDecorateHelper(decoratorExpressions []*ast.Node, target
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList(argumentsArray),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -631,6 +634,7 @@ func (f *NodeFactory) NewMetadataHelper(metadataKey string, metadataValue *ast.N
 			f.NewStringLiteral(metadataKey, ast.TokenFlagsNone),
 			metadataValue,
 		}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -642,6 +646,7 @@ func (f *NodeFactory) NewParamHelper(expression *ast.Node, parameterOffset int, 
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{f.NewNumericLiteral(strconv.Itoa(parameterOffset), ast.TokenFlagsNone), expression}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 	helper.Loc = location
@@ -657,6 +662,7 @@ func (f *NodeFactory) NewAddDisposableResourceHelper(envBinding *ast.Expression,
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{envBinding, value, f.NewKeywordExpression(core.IfElse(async, ast.KindTrueKeyword, ast.KindFalseKeyword))}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -668,6 +674,7 @@ func (f *NodeFactory) NewDisposeResourcesHelper(envBinding *ast.Expression) *ast
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{envBinding}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -696,6 +703,7 @@ func (f *NodeFactory) NewClassPrivateFieldGetHelper(receiver *ast.Expression, st
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList(args),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -713,6 +721,7 @@ func (f *NodeFactory) NewClassPrivateFieldSetHelper(receiver *ast.Expression, st
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList(args),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -724,6 +733,7 @@ func (f *NodeFactory) NewClassPrivateFieldInHelper(state *ast.IdentifierNode, re
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{state, receiver}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -740,6 +750,7 @@ func (f *NodeFactory) NewObjectDefinePropertyCall(target *ast.Expression, name *
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{target, name, descriptor}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -756,6 +767,7 @@ func (f *NodeFactory) NewReflectGetCall(target *ast.Expression, propertyKey *ast
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{target, propertyKey, receiver}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -772,6 +784,7 @@ func (f *NodeFactory) NewReflectSetCall(target *ast.Expression, propertyKey *ast
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{target, propertyKey, value, receiver}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -800,6 +813,7 @@ func (f *NodeFactory) NewImmediatelyInvokedArrowFunction(statements []*ast.State
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Node{}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -819,7 +833,7 @@ func (f *NodeFactory) NewExternalModuleExport(name *ast.IdentifierNode) *ast.Sta
 // ES2018 Helpers
 // Chains a sequence of expressions using the __assign helper or Object.assign if available in the target
 func (f *NodeFactory) NewAssignHelper(attributesSegments []*ast.Expression, scriptTarget core.ScriptTarget) *ast.Expression {
-	return f.NewCallExpression(f.NewPropertyAccessExpression(f.NewIdentifier("Object"), nil, f.NewIdentifier("assign"), ast.NodeFlagsNone), nil, nil, f.NewNodeList(attributesSegments), ast.NodeFlagsNone)
+	return f.NewCallExpression(f.NewPropertyAccessExpression(f.NewIdentifier("Object"), nil, f.NewIdentifier("assign"), ast.NodeFlagsNone), nil, nil, f.NewNodeList(attributesSegments), nil, ast.NodeFlagsNone)
 }
 
 // ES2018 Destructuring Helpers
@@ -861,6 +875,7 @@ func (f *NodeFactory) NewRestHelper(value *ast.Expression, elements []*ast.Node,
 			value,
 			propNames,
 		}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -875,6 +890,7 @@ func (f *NodeFactory) NewAwaitHelper(expression *ast.Expression) *ast.Expression
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{expression}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -906,6 +922,7 @@ func (f *NodeFactory) NewAsyncGeneratorHelper(
 			f.NewIdentifier("arguments"),
 			generatorFunc,
 		}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -919,6 +936,7 @@ func (f *NodeFactory) NewAsyncDelegatorHelper(expression *ast.Expression) *ast.E
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{expression}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -931,6 +949,7 @@ func (f *NodeFactory) NewAsyncValuesHelper(expression *ast.Expression) *ast.Expr
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{expression}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -991,6 +1010,7 @@ func (f *NodeFactory) NewAwaiterHelper(
 			f.NewVoidZeroExpression(),
 			generatorFunc,
 		}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -1172,6 +1192,7 @@ func (f *NodeFactory) NewESDecorateHelper(ctor *ast.Expression, descriptorIn *as
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -1189,6 +1210,7 @@ func (f *NodeFactory) NewRunInitializersHelper(thisArg *ast.Expression, initiali
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList(arguments),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -1202,6 +1224,7 @@ func (f *NodeFactory) NewTemplateObjectHelper(cookedArray *ast.Expression, rawAr
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{cookedArray, rawArray}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -1213,6 +1236,7 @@ func (f *NodeFactory) NewPropKeyHelper(expr *ast.Expression) *ast.Expression {
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{expr}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -1230,6 +1254,7 @@ func (f *NodeFactory) NewSetFunctionNameHelper(fn *ast.Expression, name *ast.Exp
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList(arguments),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -1244,6 +1269,7 @@ func (f *NodeFactory) NewImportDefaultHelper(expression *ast.Expression) *ast.Ex
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{expression}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -1256,6 +1282,7 @@ func (f *NodeFactory) NewImportStarHelper(expression *ast.Expression) *ast.Expre
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{expression}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -1268,6 +1295,7 @@ func (f *NodeFactory) NewExportStarHelper(moduleExpression *ast.Expression, expo
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList([]*ast.Expression{moduleExpression, exportsExpression}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -1310,6 +1338,7 @@ func (f *NodeFactory) NewRewriteRelativeImportExtensionsHelper(firstArgument *as
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		f.NewNodeList(arguments),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }

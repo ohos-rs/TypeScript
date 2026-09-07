@@ -413,6 +413,7 @@ func (tx *forawaitTransformer) transformForAwaitOfStatement(node *ast.ForInOrOfS
 		f.NewPropertyAccessExpression(iterator, nil, f.NewIdentifier("next"), ast.NodeFlagsNone),
 		nil, nil,
 		f.NewNodeList([]*ast.Node{}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 	getDone := f.NewPropertyAccessExpression(result, nil, f.NewIdentifier("done"), ast.NodeFlagsNone)

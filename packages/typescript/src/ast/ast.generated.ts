@@ -857,6 +857,7 @@ export interface CallExpression extends LeftHandSideExpressionBase, DeclarationB
     readonly questionDotToken?: QuestionDotToken;
     readonly typeArguments?: NodeArray<TypeNode>;
     readonly arguments: NodeArray<Expression>;
+    readonly etsBody?: Block;
 }
 export interface NewExpression extends PrimaryExpressionBase {
     readonly kind: SyntaxKind.NewExpression;

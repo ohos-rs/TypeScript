@@ -4424,6 +4424,8 @@ var The_invalid_diagnostic_directive_is_in_supplemental_output_0_returned_by_the
 
 var Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex = &Message{code: 100068, category: CategoryMessage, key: "Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex_100068", text: "Diagnostic directive {0} returned by the content mapper has an invalid 'unusedExpectDirectiveIndex'."}
 
+var ArkUI_JavaScript_emit_requires_the_OpenHarmony_SDK_compiler_Use_noEmit_or_emitDeclarationOnly = &Message{code: 100069, category: CategoryError, key: "ArkUI_JavaScript_emit_requires_the_OpenHarmony_SDK_compiler_Use_noEmit_or_emitDeclarationOnly_100069", text: "ArkUI JavaScript emit requires the OpenHarmony SDK compiler. Use noEmit or emitDeclarationOnly."}
+
 func keyToMessage(key Key) *Message {
 	switch key {
 	case "Unterminated_string_literal_1002":
@@ -8848,6 +8850,8 @@ func keyToMessage(key Key) *Message {
 		return The_invalid_diagnostic_directive_is_in_supplemental_output_0_returned_by_the_content_mapper
 	case "Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex_100068":
 		return Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex
+	case "ArkUI_JavaScript_emit_requires_the_OpenHarmony_SDK_compiler_Use_noEmit_or_emitDeclarationOnly_100069":
+		return ArkUI_JavaScript_emit_requires_the_OpenHarmony_SDK_compiler_Use_noEmit_or_emitDeclarationOnly
 	default:
 		return nil
 	}

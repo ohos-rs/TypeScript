@@ -11,6 +11,8 @@ import type {
     BindingPattern,
     BlockOrExpression,
     BooleanLiteral,
+    CallExpression,
+    ClassDeclaration,
     ComputedPropertyName,
     ConciseBody,
     ExclamationToken,
@@ -579,4 +581,13 @@ export function isJsxTagNameExpression(node: Node): node is JsxTagNameExpression
         || kind === SyntaxKind.Identifier
         || kind === SyntaxKind.PropertyAccessExpression
         || kind === SyntaxKind.JsxNamespacedName;
+}
+
+/** An ArkUI struct uses the class representation and retains its syntax flag. */
+export function isStructDeclaration(node: Node): node is ClassDeclaration {
+    return node.kind === SyntaxKind.ClassDeclaration && !!(node.flags & NodeFlags.Struct);
+}
+
+export function isEtsComponentExpression(node: Node): node is CallExpression {
+    return node.kind === SyntaxKind.CallExpression && !!(node.flags & NodeFlags.EtsComponent);
 }

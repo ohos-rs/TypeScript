@@ -48,7 +48,7 @@ func (ch *optionalChainTransformer) visitCallExpression(node *ast.CallExpression
 				ch.EmitContext().SetOriginal(res, node.AsNode())
 				return res
 			}
-			return ch.Factory().UpdateCallExpression(node, expression, nil /*questionDotToken*/, nil /*typeArguments*/, args, node.Flags)
+			return ch.Factory().UpdateCallExpression(node, expression, nil /*questionDotToken*/, nil /*typeArguments*/, args, node.EtsBody, node.Flags)
 		}
 	}
 	return ch.Visitor().VisitEachChild(node.AsNode())
@@ -201,6 +201,7 @@ func (ch *optionalChainTransformer) visitOptionalExpression(node *ast.Node, capt
 					nil,
 					nil,
 					ch.Visitor().VisitNodes(segment.ArgumentList()),
+					nil,
 					ast.NodeFlagsNone,
 				)
 			}

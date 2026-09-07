@@ -632,7 +632,7 @@ func (p *Program) GetPackagesMap() map[string]bool {
 		for _, resolvedModulesInFile := range p.resolvedModules {
 			for _, mod := range resolvedModulesInFile {
 				if mod.PackageId.Name != "" {
-					p.packagesMap[mod.PackageId.Name] = p.packagesMap[mod.PackageId.Name] || mod.Extension == tspath.ExtensionDts
+					p.packagesMap[mod.PackageId.Name] = p.packagesMap[mod.PackageId.Name] || mod.Extension == tspath.ExtensionDts || mod.Extension == tspath.ExtensionDets
 				}
 			}
 		}
@@ -833,7 +833,7 @@ func (p *Program) canIncludeBindAndCheckDiagnostics(sourceFile *ast.SourceFile) 
 		return false
 	}
 
-	if sourceFile.ScriptKind == core.ScriptKindTS || sourceFile.ScriptKind == core.ScriptKindTSX {
+	if sourceFile.ScriptKind == core.ScriptKindETS || sourceFile.ScriptKind == core.ScriptKindTS || sourceFile.ScriptKind == core.ScriptKindTSX {
 		return true
 	}
 

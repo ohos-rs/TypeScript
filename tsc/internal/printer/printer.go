@@ -2586,6 +2586,10 @@ func (p *Printer) emitCallExpression(node *ast.CallExpression) {
 	p.emitTokenNode(node.QuestionDotToken)
 	p.emitTypeArguments(node.AsNode(), node.TypeArguments)
 	p.emitList((*Printer).emitArgument, node.AsNode(), node.Arguments, LFCallExpressionArguments)
+	if node.EtsBody != nil {
+		p.writeSpace()
+		p.emitBlock(node.EtsBody.AsBlock())
+	}
 	p.exitNode(node.AsNode(), state)
 }
 
@@ -2685,6 +2689,10 @@ func (p *Printer) emitConciseBody(node *ast.BlockOrExpression) {
 }
 
 func (p *Printer) emitArrowFunction(node *ast.ArrowFunction) {
+	if node.Flags&ast.NodeFlagsEtsStylesBlock != 0 {
+		p.emitBlock(node.Body.AsBlock())
+		return
+	}
 	state := p.enterNode(node.AsNode())
 	p.emitModifierList(node.AsNode(), node.Modifiers(), false /*allowDecorators*/)
 	indented := p.shouldEmitIndented(node.AsNode())
@@ -3153,6 +3161,7 @@ func (p *Printer) parenthesizeExpressionForNoAsi(node *ast.Expression) *ast.Expr
 				ce.QuestionDotToken,
 				ce.TypeArguments,
 				ce.Arguments,
+				ce.EtsBody,
 				ce.Flags,
 			)
 		case ast.KindTaggedTemplateExpression:
@@ -3234,7 +3243,9 @@ func (p *Printer) emitExpression(node *ast.Expression, precedence ast.OperatorPr
 	case ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
 		p.emitTokenNode(node)
 	case ast.KindThisKeyword, ast.KindSuperKeyword, ast.KindImportKeyword:
-		p.emitKeywordExpression(node.AsKeywordExpression())
+		if node.Flags&ast.NodeFlagsEtsImplicitReceiver == 0 {
+			p.emitKeywordExpression(node.AsKeywordExpression())
+		}
 
 	// Literals
 	case ast.KindNumericLiteral:
@@ -3740,7 +3751,7 @@ func (p *Printer) emitVariableDeclarationList(node *ast.VariableDeclarationList)
 func (p *Printer) emitFunctionDeclaration(node *ast.FunctionDeclaration) {
 	state := p.enterNode(node.AsNode())
 	p.generateNameIfNeeded(node.Name())
-	p.emitModifierList(node.AsNode(), node.Modifiers(), false /*allowDecorators*/)
+	p.emitModifierList(node.AsNode(), node.Modifiers(), p.currentSourceFile != nil && p.currentSourceFile.ScriptKind == core.ScriptKindETS)
 	p.writeKeyword("function")
 	p.emitTokenNode(node.AsteriskToken)
 	p.writeSpace()
@@ -3761,7 +3772,11 @@ func (p *Printer) emitClassDeclaration(node *ast.ClassDeclaration) {
 	state := p.enterNode(node.AsNode())
 	p.generateNameIfNeeded(node.Name())
 	pos := p.emitModifierList(node.AsNode(), node.Modifiers(), true /*allowDecorators*/)
-	p.emitToken(ast.KindClassKeyword, pos, WriteKindKeyword, node.AsNode())
+	if ast.IsStructDeclaration(node.AsNode()) {
+		p.writeKeyword("struct")
+	} else {
+		p.emitToken(ast.KindClassKeyword, pos, WriteKindKeyword, node.AsNode())
+	}
 	if node.Name() != nil {
 		p.writeSpace()
 		p.emitIdentifierName(node.Name().AsIdentifier())

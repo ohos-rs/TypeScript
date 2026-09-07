@@ -250,7 +250,7 @@ func (tx *TypeEraserTransformer) visit(node *ast.Node) *ast.Node {
 
 	case ast.KindCallExpression:
 		n := node.AsCallExpression()
-		return tx.Factory().UpdateCallExpression(n, tx.Visitor().VisitNode(n.Expression), n.QuestionDotToken, nil, tx.Visitor().VisitNodes(n.Arguments), n.Flags)
+		return tx.Factory().UpdateCallExpression(n, tx.Visitor().VisitNode(n.Expression), n.QuestionDotToken, nil, tx.Visitor().VisitNodes(n.Arguments), tx.Visitor().VisitNode(n.EtsBody), n.Flags)
 
 	case ast.KindNewExpression:
 		n := node.AsNewExpression()

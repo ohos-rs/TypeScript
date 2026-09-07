@@ -251,7 +251,7 @@ func (tx *JSXTransformer) visitSourceFile(file *ast.SourceFile) *ast.Node {
 						tx.Factory().NewIdentifier("require"),
 						nil,
 						nil,
-						tx.Factory().NewNodeList([]*ast.Node{tx.Factory().NewStringLiteral(importSource, ast.TokenFlagsNone)}), ast.NodeFlagsNone,
+						tx.Factory().NewNodeList([]*ast.Node{tx.Factory().NewStringLiteral(importSource, ast.TokenFlagsNone)}), nil, ast.NodeFlagsNone,
 					),
 				)}), ast.NodeFlagsConst))
 				ast.SetParentInChildren(s)
@@ -592,7 +592,7 @@ func (tx *JSXTransformer) visitJsxOpeningLikeElementOrFragmentJSX(
 		}
 	}
 
-	element := tx.Factory().NewCallExpression(tx.getJsxFactoryCallee(isStaticChildren), nil, nil, tx.Factory().NewNodeList(args), ast.NodeFlagsNone)
+	element := tx.Factory().NewCallExpression(tx.getJsxFactoryCallee(isStaticChildren), nil, nil, tx.Factory().NewNodeList(args), nil, ast.NodeFlagsNone)
 	element.Loc = location
 
 	if tx.inJsxChild {
@@ -723,6 +723,7 @@ func (tx *JSXTransformer) visitJsxOpeningLikeElementCreateElement(element *ast.N
 		nil,
 		nil,
 		tx.Factory().NewNodeList(args),
+		nil,
 		ast.NodeFlagsNone,
 	)
 	result.Loc = location
@@ -764,6 +765,7 @@ func (tx *JSXTransformer) visitJsxOpeningFragmentCreateElement(fragment *ast.Jsx
 		nil,
 		nil,
 		tx.Factory().NewNodeList(args),
+		nil,
 		ast.NodeFlagsNone,
 	)
 	result.Loc = location

@@ -740,6 +740,9 @@ func main() {
 			"PossiblyContainsDeprecatedTag":      toInt32(ast.NodeFlagsPossiblyContainsDeprecatedTag),
 			"Unreachable":                        toInt32(ast.NodeFlagsUnreachable),
 			"ReparserTransformedLiteral":         toInt32(ast.NodeFlagsReparserTransformedLiteral),
+			"Struct":                             toInt32(ast.NodeFlagsStruct),
+			"EtsComponent":                       toInt32(ast.NodeFlagsEtsComponent),
+			"EtsImplicitReceiver":                toInt32(ast.NodeFlagsEtsImplicitReceiver),
 			"BlockScoped":                        toInt32(ast.NodeFlagsBlockScoped),
 			"Constant":                           toInt32(ast.NodeFlagsConstant),
 			"AwaitUsing":                         toInt32(ast.NodeFlagsAwaitUsing),
@@ -750,6 +753,8 @@ func main() {
 			"PermanentlySetIncrementalFlags":     toInt32(ast.NodeFlagsPermanentlySetIncrementalFlags),
 			"IdentifierHasExtendedUnicodeEscape": toInt32(ast.NodeFlagsIdentifierHasExtendedUnicodeEscape),
 			"IdentifierIsInJSDocNamespace":       toInt32(ast.NodeFlagsIdentifierIsInJSDocNamespace),
+			"EtsBinding":                         toInt32(ast.NodeFlagsEtsBinding),
+			"EtsStylesBlock":                     toInt32(ast.NodeFlagsEtsStylesBlock),
 			"NestedNamespace":                    toInt32(ast.NodeFlagsNestedNamespace),
 		},
 		"OuterExpressionKinds": {
@@ -858,6 +863,7 @@ func main() {
 			"TS":      toInt32(core.ScriptKindTS),
 			"TSX":     toInt32(core.ScriptKindTSX),
 			"JSON":    toInt32(core.ScriptKindJSON),
+			"ETS":     toInt32(core.ScriptKindETS),
 		},
 		"TokenFlags": {
 			"None":                           toInt32(ast.TokenFlagsNone),

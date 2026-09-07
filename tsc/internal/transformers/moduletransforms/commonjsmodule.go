@@ -279,6 +279,7 @@ func (tx *CommonJSModuleTransformer) createUnderscoreUnderscoreESModule() *ast.S
 					false, /*multiLine*/
 				),
 			}),
+			nil,
 			ast.NodeFlagsNone,
 		),
 	)
@@ -643,6 +644,7 @@ func (tx *CommonJSModuleTransformer) createExportExpression(name *ast.ModuleExpo
 					false, /*multiLine*/
 				),
 			}),
+			nil,
 			ast.NodeFlagsNone,
 		)
 	} else {
@@ -687,6 +689,7 @@ func (tx *CommonJSModuleTransformer) createRequireCall(node *ast.Node /*ImportDe
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		tx.Factory().NewNodeList(args),
+		nil,
 		ast.NodeFlagsNone,
 	)
 }
@@ -1829,7 +1832,7 @@ func (tx *CommonJSModuleTransformer) visitCallExpression(node *ast.CallExpressio
 			node.QuestionDotToken,
 			nil, /*typeArguments*/
 			tx.Visitor().VisitNodes(node.Arguments),
-			node.Flags,
+			node.EtsBody, node.Flags,
 		)
 		if !ast.IsIdentifier(expression) && !transformers.IsHelperName(tx.EmitContext(), node.Expression) {
 			tx.EmitContext().AddEmitFlags(updated, printer.EFIndirectCall)
@@ -1899,6 +1902,7 @@ func (tx *CommonJSModuleTransformer) createImportCallExpressionCommonJS(arg *ast
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		tx.Factory().NewNodeList(promiseResolveArguments),
+		nil,
 		ast.NodeFlagsNone,
 	)
 
@@ -1917,6 +1921,7 @@ func (tx *CommonJSModuleTransformer) createImportCallExpressionCommonJS(arg *ast
 			nil, /*questionDotToken*/
 			nil, /*typeArguments*/
 			tx.Factory().NewNodeList(requireArguments),
+			nil,
 			ast.NodeFlagsNone,
 		),
 	)
@@ -1955,6 +1960,7 @@ func (tx *CommonJSModuleTransformer) createImportCallExpressionCommonJS(arg *ast
 		nil, /*questionDotToken*/
 		nil, /*typeArguments*/
 		tx.Factory().NewNodeList([]*ast.Expression{function}),
+		nil,
 		ast.NodeFlagsNone,
 	)
 	return downleveledImport
@@ -1989,7 +1995,7 @@ func (tx *CommonJSModuleTransformer) shimOrRewriteImportOrRequireCall(node *ast.
 		node.QuestionDotToken,
 		nil, /*typeArguments*/
 		argumentsList,
-		node.Flags,
+		node.EtsBody, node.Flags,
 	)
 }
 

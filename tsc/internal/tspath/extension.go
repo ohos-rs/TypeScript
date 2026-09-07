@@ -6,6 +6,8 @@ import (
 )
 
 const (
+	ExtensionEts         = ".ets"
+	ExtensionDets        = ".d.ets"
 	ExtensionTs          = ".ts"
 	ExtensionTsx         = ".tsx"
 	ExtensionDts         = ".d.ts"
@@ -22,12 +24,12 @@ const (
 )
 
 var (
-	SupportedDeclarationExtensions                 = []string{ExtensionDts, ExtensionDcts, ExtensionDmts}
-	SupportedTSImplementationExtensions            = []string{ExtensionTs, ExtensionTsx, ExtensionMts, ExtensionCts}
-	supportedTSExtensionsForExtractExtension       = []string{ExtensionDts, ExtensionDcts, ExtensionDmts, ExtensionTs, ExtensionTsx, ExtensionMts, ExtensionCts}
-	AllSupportedExtensions                         = [][]string{{ExtensionTs, ExtensionTsx, ExtensionDts, ExtensionJs, ExtensionJsx}, {ExtensionCts, ExtensionDcts, ExtensionCjs}, {ExtensionMts, ExtensionDmts, ExtensionMjs}}
-	SupportedTSExtensions                          = [][]string{{ExtensionTs, ExtensionTsx, ExtensionDts}, {ExtensionCts, ExtensionDcts}, {ExtensionMts, ExtensionDmts}}
-	SupportedTSExtensionsFlat                      = []string{ExtensionTs, ExtensionTsx, ExtensionDts, ExtensionCts, ExtensionDcts, ExtensionMts, ExtensionDmts}
+	SupportedDeclarationExtensions                 = []string{ExtensionDts, ExtensionDcts, ExtensionDmts, ExtensionDets}
+	SupportedTSImplementationExtensions            = []string{ExtensionTs, ExtensionTsx, ExtensionMts, ExtensionCts, ExtensionEts}
+	supportedTSExtensionsForExtractExtension       = []string{ExtensionDets, ExtensionEts, ExtensionDts, ExtensionDcts, ExtensionDmts, ExtensionTs, ExtensionTsx, ExtensionMts, ExtensionCts}
+	AllSupportedExtensions                         = [][]string{{ExtensionTs, ExtensionTsx, ExtensionDts, ExtensionJs, ExtensionJsx}, {ExtensionCts, ExtensionDcts, ExtensionCjs}, {ExtensionMts, ExtensionDmts, ExtensionMjs}, {ExtensionEts, ExtensionDets}}
+	SupportedTSExtensions                          = [][]string{{ExtensionTs, ExtensionTsx, ExtensionDts}, {ExtensionCts, ExtensionDcts}, {ExtensionMts, ExtensionDmts}, {ExtensionEts, ExtensionDets}}
+	SupportedTSExtensionsFlat                      = []string{ExtensionTs, ExtensionTsx, ExtensionDts, ExtensionCts, ExtensionDcts, ExtensionMts, ExtensionDmts, ExtensionEts, ExtensionDets}
 	SupportedJSExtensions                          = [][]string{{ExtensionJs, ExtensionJsx}, {ExtensionMjs}, {ExtensionCjs}}
 	SupportedJSExtensionsFlat                      = []string{ExtensionJs, ExtensionJsx, ExtensionMjs, ExtensionCjs}
 	AllSupportedExtensionsWithJson                 = slices.Concat(AllSupportedExtensions, [][]string{{ExtensionJson}})
@@ -37,10 +39,10 @@ var (
 )
 
 func ExtensionIsTs(ext string) bool {
-	return ext == ExtensionTs || ext == ExtensionTsx || ext == ExtensionDts || ext == ExtensionMts || ext == ExtensionDmts || ext == ExtensionCts || ext == ExtensionDcts || len(ext) >= 7 && ext[:3] == ".d." && ext[len(ext)-3:] == ".ts"
+	return ext == ExtensionEts || ext == ExtensionDets || ext == ExtensionTs || ext == ExtensionTsx || ext == ExtensionDts || ext == ExtensionMts || ext == ExtensionDmts || ext == ExtensionCts || ext == ExtensionDcts || len(ext) >= 7 && ext[:3] == ".d." && ext[len(ext)-3:] == ".ts"
 }
 
-var extensionsToRemove = []string{ExtensionDts, ExtensionDmts, ExtensionDcts, ExtensionMjs, ExtensionMts, ExtensionCjs, ExtensionCts, ExtensionTs, ExtensionJs, ExtensionTsx, ExtensionJsx, ExtensionJson}
+var extensionsToRemove = []string{ExtensionDets, ExtensionEts, ExtensionDts, ExtensionDmts, ExtensionDcts, ExtensionMjs, ExtensionMts, ExtensionCjs, ExtensionCts, ExtensionTs, ExtensionJs, ExtensionTsx, ExtensionJsx, ExtensionJson}
 
 func RemoveFileExtension(path string) string {
 	// Remove any known extension even if it has more than one dot
@@ -136,6 +138,8 @@ func GetDeclarationFileExtension(fileName string) string {
 
 func GetDeclarationEmitExtensionForPath(path string) string {
 	switch {
+	case FileExtensionIs(path, ExtensionEts):
+		return ExtensionDets
 	case FileExtensionIsOneOf(path, []string{ExtensionMjs, ExtensionMts}):
 		return ExtensionDmts
 	case FileExtensionIsOneOf(path, []string{ExtensionCjs, ExtensionCts}):
@@ -193,6 +197,9 @@ func ChangeFullExtension(path string, newExtension string) string {
 }
 
 func GetPossibleOriginalInputExtensionForExtension(path string) []string {
+	if FileExtensionIs(path, ExtensionEts) {
+		return []string{ExtensionEts}
+	}
 	if FileExtensionIsOneOf(path, []string{ExtensionDmts, ExtensionMjs, ExtensionMts}) {
 		return []string{ExtensionMts, ExtensionMjs}
 	}
@@ -204,5 +211,5 @@ func GetPossibleOriginalInputExtensionForExtension(path string) []string {
 		inner := ext[len(".d.") : len(ext)-len(".ts")]
 		return []string{"." + inner}
 	}
-	return []string{ExtensionTsx, ExtensionTs, ExtensionJsx, ExtensionJs}
+	return []string{ExtensionTsx, ExtensionTs, ExtensionJsx, ExtensionJs, ExtensionEts}
 }

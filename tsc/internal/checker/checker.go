@@ -4299,7 +4299,7 @@ func (c *Checker) checkBindingElement(node *ast.Node) {
 }
 
 func (c *Checker) checkClassDeclaration(node *ast.Node) {
-	firstDecorator := core.Find(node.ModifierNodes(), ast.IsDecorator)
+	firstDecorator := core.Find(node.ModifierNodes(), func(n *ast.Node) bool { return ast.IsDecorator(n) && !ast.IsArkUICompilerDecorator(n) })
 	if c.legacyDecorators && firstDecorator != nil && core.Some(node.Members(), func(p *ast.Node) bool {
 		return ast.HasStaticModifier(p) && ast.IsPrivateIdentifierClassElementDeclaration(p)
 	}) {
@@ -5022,6 +5022,9 @@ func (c *Checker) checkPropertyInitialization(node *ast.Node) {
 	}
 	constructor := ast.FindConstructorDeclaration(node)
 	for _, member := range node.Members() {
+		if ast.IsStructDeclaration(node) && ast.HasArkUIDecorator(member.Modifiers(), "Prop", "Link", "Consume", "ObjectLink", "StorageLink", "StorageProp", "LocalStorageLink", "LocalStorageProp", "BuilderParam", "Param", "Event", "Consumer") {
+			continue
+		}
 		if member.ModifierFlags()&ast.ModifierFlagsAmbient != 0 {
 			continue
 		}
@@ -6190,7 +6193,7 @@ func (c *Checker) checkDecorators(node *ast.Node) {
 	if !ast.CanHaveDecorators(node) || !ast.HasDecorators(node) || !ast.NodeCanBeDecorated(c.legacyDecorators, node, node.Parent, node.Parent.Parent) {
 		return
 	}
-	firstDecorator := core.Find(node.ModifierNodes(), ast.IsDecorator)
+	firstDecorator := core.Find(node.ModifierNodes(), func(n *ast.Node) bool { return ast.IsDecorator(n) && !ast.IsArkUICompilerDecorator(n) })
 	if firstDecorator == nil {
 		return
 	}
@@ -6217,7 +6220,7 @@ func (c *Checker) checkDecorators(node *ast.Node) {
 	}
 	c.markLinkedReferences(node, ReferenceHintDecorator, nil, nil)
 	for _, modifier := range node.ModifierNodes() {
-		if ast.IsDecorator(modifier) {
+		if ast.IsDecorator(modifier) && !ast.IsArkUICompilerDecorator(modifier) {
 			c.checkDecorator(modifier)
 		}
 	}
@@ -7900,6 +7903,9 @@ func (c *Checker) checkExpressionWorker(node *ast.Node, checkMode CheckMode) *Ty
 	case ast.KindPrivateIdentifier:
 		return c.checkPrivateIdentifierExpression(node)
 	case ast.KindThisKeyword:
+		if node.Flags&ast.NodeFlagsEtsImplicitReceiver != 0 {
+			return c.getArkUIImplicitReceiverType(node)
+		}
 		return c.checkThisExpression(node)
 	case ast.KindSuperKeyword:
 		return c.checkSuperExpression(node)
@@ -7948,6 +7954,10 @@ func (c *Checker) checkExpressionWorker(node *ast.Node, checkMode CheckMode) *Ty
 	case ast.KindClassExpression:
 		return c.checkClassExpression(node)
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
+		if node.Flags&ast.NodeFlagsEtsStylesBlock != 0 {
+			c.checkSourceElement(node.Body())
+			return c.getArkUIImplicitReceiverType(node)
+		}
 		return c.checkFunctionExpressionOrObjectLiteralMethod(node, checkMode)
 	case ast.KindTypeAssertionExpression, ast.KindAsExpression:
 		return c.checkAssertion(node, checkMode)
@@ -8487,6 +8497,9 @@ func (c *Checker) checkImportCallExpression(node *ast.Node) *Type {
  * @returns On success, the expression's signature's return type. On failure, anyType.
  */
 func (c *Checker) checkCallExpression(node *ast.Node, checkMode CheckMode) *Type {
+	if ast.IsCallExpression(node) && node.AsCallExpression().EtsBody != nil {
+		c.checkSourceElement(node.AsCallExpression().EtsBody)
+	}
 	c.checkGrammarTypeArguments(node, node.TypeArgumentList())
 	signature := c.getResolvedSignature(node, nil /*candidatesOutArray*/, checkMode)
 	if signature == c.resolvingSignature {
@@ -8688,6 +8701,11 @@ func (c *Checker) resolveCallExpression(node *ast.Node, candidatesOutArray *[]*S
 	// but we are not including call signatures that may have been added to the Object or
 	// Function interface, since they have none by default. This is a bit of a leap of faith
 	// that the user will not add any.
+	if ast.IsEtsComponentExpression(node) {
+		if signature := c.getArkUIStructSignature(apparentType); signature != nil {
+			return c.resolveCall(node, []*Signature{signature}, candidatesOutArray, checkMode, SignatureFlagsNone, nil)
+		}
+	}
 	callSignatures := c.getSignaturesOfType(apparentType, SignatureKindCall)
 	numConstructSignatures := len(c.getSignaturesOfType(apparentType, SignatureKindConstruct))
 	// TS 1.0 Spec: 4.12
@@ -11222,6 +11240,9 @@ func (c *Checker) checkSyntheticExpression(node *ast.Node) *Type {
 }
 
 func (c *Checker) checkIdentifier(node *ast.Node, checkMode CheckMode) *Type {
+	if node.Flags&ast.NodeFlagsEtsBinding != 0 && node.Text() == "$$this" {
+		return c.checkThisExpression(node)
+	}
 	if ast.IsThisInTypeQuery(node) {
 		return c.checkThisExpression(node)
 	}
@@ -11503,6 +11524,9 @@ func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, l
 			return apparentType
 		}
 		prop = c.getPropertyOfTypeEx(apparentType, right.Text(), isConstEnumObjectType(apparentType) /*skipObjectFunctionPropertyAugment*/, node.Kind == ast.KindQualifiedName /*includeTypeOnlyMembers*/)
+		if prop == nil {
+			prop = c.getArkUIStyleProperty(node, left, right, leftType)
+		}
 	}
 	c.markLinkedReferences(node, ReferenceHintProperty, prop, leftType)
 	var propType *Type
@@ -14108,8 +14132,13 @@ func (c *Checker) getResolvedSymbol(node *ast.Node) *ast.Symbol {
 	if links.resolvedSymbol == nil {
 		var symbol *ast.Symbol
 		if !ast.NodeIsMissing(node) {
-			symbol = c.resolveName(node, node.Text(), ast.SymbolFlagsValue|ast.SymbolFlagsExportValue,
-				c.getCannotFindNameDiagnosticForName(node), !ast.IsWriteOnlyAccess(node), false /*excludeGlobals*/)
+			if node.Flags&ast.NodeFlagsEtsBinding != 0 {
+				symbol = c.getArkUIBindingSymbol(node)
+			}
+			if symbol == nil {
+				symbol = c.resolveName(node, node.Text(), ast.SymbolFlagsValue|ast.SymbolFlagsExportValue,
+					c.getCannotFindNameDiagnosticForName(node), !ast.IsWriteOnlyAccess(node), false /*excludeGlobals*/)
+			}
 		}
 		links.resolvedSymbol = core.OrElse(symbol, c.unknownSymbol)
 	}
@@ -15735,6 +15764,8 @@ func (c *Checker) getSuggestedImportSource(moduleReference string, tsExtension s
 		preferTs := tspath.IsDeclarationFileName(moduleReference) && c.compilerOptions.GetAllowImportingTsExtensions()
 		var ext string
 		switch {
+		case tsExtension == tspath.ExtensionEts || tsExtension == tspath.ExtensionDets:
+			ext = core.IfElse(preferTs, ".ets", ".js")
 		case tsExtension == tspath.ExtensionMts || tsExtension == tspath.ExtensionDmts:
 			ext = core.IfElse(preferTs, ".mts", ".mjs")
 		case tsExtension == tspath.ExtensionCts || tsExtension == tspath.ExtensionDcts:

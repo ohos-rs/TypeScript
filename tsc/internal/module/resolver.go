@@ -937,7 +937,7 @@ func (r *resolutionState) tryLoadInputFileForPath(finalPath string, entry string
 					pathFragment = finalPath[len(candidateDir)+1:] // +1 to also remove directory separator
 				}
 				possibleInputBase := tspath.CombinePaths(rootDir, pathFragment)
-				jsAndDtsExtensions := []string{tspath.ExtensionMjs, tspath.ExtensionCjs, tspath.ExtensionJs, tspath.ExtensionJson, tspath.ExtensionDmts, tspath.ExtensionDcts, tspath.ExtensionDts}
+				jsAndDtsExtensions := []string{tspath.ExtensionMjs, tspath.ExtensionCjs, tspath.ExtensionJs, tspath.ExtensionJson, tspath.ExtensionDmts, tspath.ExtensionDcts, tspath.ExtensionDts, tspath.ExtensionDets}
 				for _, ext := range jsAndDtsExtensions {
 					if tspath.FileExtensionIs(possibleInputBase, ext) {
 						inputExts := tspath.GetPossibleOriginalInputExtensionForExtension(possibleInputBase)
@@ -1525,6 +1525,16 @@ func (r *resolutionState) tryAddingExtensions(extensionless string, extensions e
 			}
 		}
 		return continueSearching()
+	case tspath.ExtensionEts, tspath.ExtensionDets:
+		if extensions&extensionsTypeScript != 0 {
+			if resolved := r.tryExtension(tspath.ExtensionEts, extensionless, true); !resolved.shouldContinueSearching() {
+				return resolved
+			}
+		}
+		if extensions&extensionsDeclaration != 0 {
+			return r.tryExtension(tspath.ExtensionDets, extensionless, true)
+		}
+		return continueSearching()
 	case tspath.ExtensionTs, tspath.ExtensionDts, tspath.ExtensionJs, "":
 		if extensions&extensionsTypeScript != 0 {
 			if resolved := r.tryExtension(tspath.ExtensionTs, extensionless, originalExtension == tspath.ExtensionTs || originalExtension == tspath.ExtensionDts); !resolved.shouldContinueSearching() {
@@ -1536,6 +1546,16 @@ func (r *resolutionState) tryAddingExtensions(extensionless string, extensions e
 		}
 		if extensions&extensionsDeclaration != 0 {
 			if resolved := r.tryExtension(tspath.ExtensionDts, extensionless, originalExtension == tspath.ExtensionTs || originalExtension == tspath.ExtensionDts); !resolved.shouldContinueSearching() {
+				return resolved
+			}
+		}
+		if extensions&extensionsTypeScript != 0 {
+			if resolved := r.tryExtension(tspath.ExtensionEts, extensionless, false); !resolved.shouldContinueSearching() {
+				return resolved
+			}
+		}
+		if extensions&extensionsDeclaration != 0 {
+			if resolved := r.tryExtension(tspath.ExtensionDets, extensionless, false); !resolved.shouldContinueSearching() {
 				return resolved
 			}
 		}
@@ -2073,8 +2093,8 @@ func matchesPatternWithTrailer(target string, name string) bool {
 /** True if `extension` is one of the supported `extensions`. */
 func extensionIsOk(extensions extensions, extension string) bool {
 	return (extensions&extensionsJavaScript != 0 && (extension == tspath.ExtensionJs || extension == tspath.ExtensionJsx || extension == tspath.ExtensionMjs || extension == tspath.ExtensionCjs) ||
-		(extensions&extensionsTypeScript != 0 && (extension == tspath.ExtensionTs || extension == tspath.ExtensionTsx || extension == tspath.ExtensionMts || extension == tspath.ExtensionCts)) ||
-		(extensions&extensionsDeclaration != 0 && (extension == tspath.ExtensionDts || extension == tspath.ExtensionDmts || extension == tspath.ExtensionDcts)) ||
+		(extensions&extensionsTypeScript != 0 && (extension == tspath.ExtensionEts || extension == tspath.ExtensionTs || extension == tspath.ExtensionTsx || extension == tspath.ExtensionMts || extension == tspath.ExtensionCts)) ||
+		(extensions&extensionsDeclaration != 0 && (extension == tspath.ExtensionDets || extension == tspath.ExtensionDts || extension == tspath.ExtensionDmts || extension == tspath.ExtensionDcts)) ||
 		(extensions&extensionsJson != 0 && extension == tspath.ExtensionJson))
 }
 

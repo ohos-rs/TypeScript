@@ -3126,6 +3126,11 @@
                         "list": "NodeList"
                     },
                     {
+                        "name": "EtsBody",
+                        "type": "Block",
+                        "optional": true
+                    },
+                    {
                         "name": "Flags",
                         "inherited": true,
                         "bitmask": "NodeFlagsOptionalChain"

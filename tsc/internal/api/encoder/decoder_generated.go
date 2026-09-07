@@ -635,7 +635,8 @@ func (d *astDecoder) createChildrenNode(kind ast.Kind, data uint32, childIndices
 		questionDotToken := d.nodeAt(it.nextIf(mask, 1))
 		typeArguments := d.nodeListAt(it.nextIf(mask, 2))
 		arguments := d.nodeListAt(it.nextIf(mask, 3))
-		return d.factory.NewCallExpression(expression, questionDotToken, typeArguments, arguments, 0), nil
+		etsBody := d.nodeAt(it.nextIf(mask, 4))
+		return d.factory.NewCallExpression(expression, questionDotToken, typeArguments, arguments, etsBody, 0), nil
 	case ast.KindNewExpression:
 		it := newChildIter(childIndices)
 		expression := d.nodeAt(it.nextIf(mask, 0))

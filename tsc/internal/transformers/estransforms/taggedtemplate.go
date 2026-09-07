@@ -119,7 +119,7 @@ func (tx *taggedTemplateTransformer) processTaggedTemplateExpression(node *ast.T
 		templateArguments[0] = helperCall
 	}
 
-	call := f.NewCallExpression(tag, nil /*questionDotToken*/, nil /*typeArguments*/, f.NewNodeList(templateArguments), ast.NodeFlagsNone)
+	call := f.NewCallExpression(tag, nil /*questionDotToken*/, nil /*typeArguments*/, f.NewNodeList(templateArguments), nil, ast.NodeFlagsNone)
 	call.Loc = node.Loc
 	return call
 }

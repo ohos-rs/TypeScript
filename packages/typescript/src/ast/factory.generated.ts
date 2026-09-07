@@ -391,6 +391,9 @@ export class NodeObject {
     get equalsToken(): any {
         return this._data?.equalsToken;
     }
+    get etsBody(): any {
+        return this._data?.etsBody;
+    }
     get exclamationToken(): any {
         return this._data?.exclamationToken;
     }
@@ -922,7 +925,7 @@ function cloneNodeData(node: Node): any {
         case SyntaxKind.ElementAccessExpression:
             return { expression: n.expression, questionDotToken: n.questionDotToken, argumentExpression: n.argumentExpression };
         case SyntaxKind.CallExpression:
-            return { expression: n.expression, questionDotToken: n.questionDotToken, typeArguments: n.typeArguments, arguments: n.arguments };
+            return { expression: n.expression, questionDotToken: n.questionDotToken, typeArguments: n.typeArguments, arguments: n.arguments, etsBody: n.etsBody };
         case SyntaxKind.NewExpression:
             return { expression: n.expression, typeArguments: n.typeArguments, arguments: n.arguments };
         case SyntaxKind.MetaProperty:
@@ -1399,7 +1402,8 @@ const forEachChildTable: Record<number, ForEachChildFunction> = {
         visitNode(cbNode, data.expression) ||
         visitNode(cbNode, data.questionDotToken) ||
         visitNodes(cbNode, cbNodes, data.typeArguments) ||
-        visitNodes(cbNode, cbNodes, data.arguments),
+        visitNodes(cbNode, cbNodes, data.arguments) ||
+        visitNode(cbNode, data.etsBody),
     [SyntaxKind.NewExpression]: (data, cbNode, cbNodes) =>
         visitNode(cbNode, data.expression) ||
         visitNodes(cbNode, cbNodes, data.typeArguments) ||
@@ -2309,12 +2313,13 @@ export function createElementAccessExpression(expression: Expression, questionDo
     return node;
 }
 
-export function createCallExpression(expression: Expression, questionDotToken: QuestionDotToken | undefined, typeArguments: readonly TypeNode[] | undefined, arguments_: readonly Expression[], flags: NodeFlags): CallExpression {
+export function createCallExpression(expression: Expression, questionDotToken: QuestionDotToken | undefined, typeArguments: readonly TypeNode[] | undefined, arguments_: readonly Expression[], etsBody: Block | undefined, flags: NodeFlags): CallExpression {
     const node = new NodeObject(SyntaxKind.CallExpression, {
         expression,
         questionDotToken,
         typeArguments: typeArguments ? createNodeArray(typeArguments) : undefined,
         arguments: createNodeArray(arguments_),
+        etsBody,
     }) as unknown as CallExpression;
     (node as any).flags = flags;
     return node;
@@ -3413,8 +3418,8 @@ export function updateElementAccessExpression(node: ElementAccessExpression, exp
     return node.expression !== expression || node.questionDotToken !== questionDotToken || node.argumentExpression !== argumentExpression ? createElementAccessExpression(expression, questionDotToken, argumentExpression, node.flags) : node;
 }
 
-export function updateCallExpression(node: CallExpression, expression: Expression, questionDotToken: QuestionDotToken | undefined, typeArguments: readonly TypeNode[] | undefined, arguments_: readonly Expression[]): CallExpression {
-    return node.expression !== expression || node.questionDotToken !== questionDotToken || node.typeArguments !== typeArguments || node.arguments !== arguments_ ? createCallExpression(expression, questionDotToken, typeArguments, arguments_, node.flags) : node;
+export function updateCallExpression(node: CallExpression, expression: Expression, questionDotToken: QuestionDotToken | undefined, typeArguments: readonly TypeNode[] | undefined, arguments_: readonly Expression[], etsBody?: Block): CallExpression {
+    return node.expression !== expression || node.questionDotToken !== questionDotToken || node.typeArguments !== typeArguments || node.arguments !== arguments_ || node.etsBody !== etsBody ? createCallExpression(expression, questionDotToken, typeArguments, arguments_, etsBody, node.flags) : node;
 }
 
 export function updateNewExpression(node: NewExpression, expression: Expression, typeArguments?: readonly TypeNode[], arguments_?: readonly Expression[]): NewExpression {

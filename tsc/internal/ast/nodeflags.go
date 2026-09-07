@@ -46,6 +46,11 @@ const (
 	NodeFlagsUnreachable                   NodeFlags = 1 << 27 // If node is unreachable according to the binder
 	NodeFlagsReparserTransformedLiteral    NodeFlags = 1 << 28 // If node was transformed during parsing, making its' naive text source not match the AST
 
+	// ArkUI nodes retain the class/call representation used by the checker.
+	NodeFlagsStruct              NodeFlags = 1 << 29
+	NodeFlagsEtsComponent        NodeFlags = 1 << 30
+	NodeFlagsEtsImplicitReceiver NodeFlags = 1 << 31
+
 	NodeFlagsBlockScoped = NodeFlagsLet | NodeFlagsConst | NodeFlagsUsing
 	NodeFlagsConstant    = NodeFlagsConst | NodeFlagsUsing
 	NodeFlagsAwaitUsing  = NodeFlagsConst | NodeFlagsUsing // Variable declaration (NOTE: on a single node these flags would otherwise be mutually exclusive)
@@ -67,6 +72,10 @@ const (
 	// The following flags repurpose other NodeFlags as different meanings for Identifier nodes
 	NodeFlagsIdentifierHasExtendedUnicodeEscape NodeFlags = NodeFlagsContainsThis      // Indicates whether the identifier contains an extended unicode escape sequence
 	NodeFlagsIdentifierIsInJSDocNamespace       NodeFlags = NodeFlagsHasAsyncFunctions // Indicates the identifier is the innermost name of a JSDoc namespace declaration
+
+	// Kind-specific ArkUI flags share storage with Struct (class declarations only).
+	NodeFlagsEtsBinding     NodeFlags = NodeFlagsStruct // Identifier
+	NodeFlagsEtsStylesBlock NodeFlags = NodeFlagsStruct // ArrowFunction
 
 	// The following flag repurposes other NodeFlags for ModuleDeclaration nodes
 	NodeFlagsNestedNamespace NodeFlags = NodeFlagsOptionalChain // If ModuleDeclaration is a nested namespace (e.g. inner part of A.B.C)
