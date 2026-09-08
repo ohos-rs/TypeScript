@@ -64,3 +64,37 @@ func TestEtsLibrariesLoadAndVisibility(t *testing.T) {
 		})
 	}
 }
+
+func TestEtsLoaderSelectsSdkTypeScriptLibrary(t *testing.T) {
+	const sdkLibrary = "/sdk/ets-loader/node_modules/typescript/lib/lib.es2020.d.ts"
+	files := map[string]string{
+		"/sdk/ets-loader/node_modules/typescript/lib/lib.d.ts": "/// <reference no-default-lib=\"true\"/>",
+		sdkLibrary:   "/// <reference no-default-lib=\"true\"/>\ndeclare const sdkLibraryMarker: unique symbol;",
+		"/input.ets": "sdkLibraryMarker;",
+	}
+	options := &core.CompilerOptions{
+		EtsLoaderPath: "/sdk/ets-loader",
+		Lib:           []string{"lib.es2020.d.ts"},
+		NoEmit:        core.TSTrue,
+	}
+	program := compiler.NewProgram(compiler.ProgramOptions{
+		Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+			FileNames:       []string{"/input.ets"},
+			CompilerOptions: options,
+		}},
+		Host: compiler.NewCompilerHost(
+			"/",
+			bundled.WrapFS(vfstest.FromMap(files, true)),
+			bundled.LibPath(),
+			nil,
+			nil,
+			nil,
+		),
+	})
+	if program.GetSourceFile(sdkLibrary) == nil {
+		t.Fatal("OH programs must use the TypeScript standard library shipped by ets-loader")
+	}
+	if diagnostics := program.GetSemanticDiagnostics(t.Context(), program.GetSourceFile("/input.ets")); len(diagnostics) != 0 {
+		t.Fatalf("SDK library declarations must be visible to ArkTS sources: %v", diagnostics)
+	}
+}

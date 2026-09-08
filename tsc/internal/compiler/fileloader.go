@@ -158,9 +158,22 @@ func processAllProgramFiles(
 	if p := opts.Config.CompilerOptions().MaxNodeModuleJsDepth; p != nil {
 		maxNodeModuleJsDepth = *p
 	}
+	defaultLibraryPath := opts.Host.DefaultLibraryPath()
+	if compilerOptions.EtsLoaderPath != "" {
+		sdkTypeScriptLibraryPath := tspath.GetNormalizedAbsolutePath(
+			tspath.CombinePaths(compilerOptions.EtsLoaderPath, "node_modules/typescript/lib"),
+			opts.Host.GetCurrentDirectory(),
+		)
+		// ets_checker.ts loads the TypeScript module shipped by ets-loader, so
+		// its standard libraries come from this directory as well. Keep the
+		// bundled TSGO libraries only for non-OH callers or incomplete SDKs.
+		if opts.Host.FS().FileExists(tspath.CombinePaths(sdkTypeScriptLibraryPath, "lib.d.ts")) {
+			defaultLibraryPath = sdkTypeScriptLibraryPath
+		}
+	}
 	loader := fileLoader{
 		opts:               opts,
-		defaultLibraryPath: tspath.GetNormalizedAbsolutePath(opts.Host.DefaultLibraryPath(), opts.Host.GetCurrentDirectory()),
+		defaultLibraryPath: tspath.GetNormalizedAbsolutePath(defaultLibraryPath, opts.Host.GetCurrentDirectory()),
 		comparePathsOptions: tspath.ComparePathsOptions{
 			UseCaseSensitiveFileNames: opts.Host.FS().UseCaseSensitiveFileNames(),
 			CurrentDirectory:          opts.Host.GetCurrentDirectory(),
