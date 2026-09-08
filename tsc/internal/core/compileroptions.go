@@ -275,6 +275,11 @@ func (options *CompilerOptions) Clone() *CompilerOptions {
 			targetValue.Field(i).Set(sourceValue.Field(i))
 		}
 	}
+	// The OH SDK callback executor is build-host state rather than a serialized
+	// compiler option, but the ArkTS 1.1 linter creates a strict checker from a
+	// cloned option set. Keep the same synchronous executor so that both the
+	// normal and strict checkers use the SDK-owned version/syscap callbacks.
+	target.ohSdkPluginExecutor = options.ohSdkPluginExecutor
 
 	return target
 }

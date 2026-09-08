@@ -439,6 +439,37 @@ func TestOHSDKExternalSinceCompatibilityChecker(t *testing.T) {
 	}
 }
 
+// ArkTSLinter_1_1 creates a second strict checker by cloning compiler options.
+// SDK callback state belongs to the compiler host and must remain available to
+// that checker, otherwise HarmonyOS point versions fall back to integer
+// comparison and report false compatibility warnings.
+func TestOHSDKExternalSinceCompatibilityCheckerInArkTSLinter(t *testing.T) {
+	t.Parallel()
+	compatible := float64(17)
+	compile := float64(17)
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/sdk/@ohos.sample.d.ts": `/**
+             * @since 11
+             * @syscap SystemCapability.Base
+             */ declare function current(): void;`,
+		"/project/entry/src/main/ets/entry.ets": `current();`,
+	}, true))
+	options := ohSDKJSDocOptions(&compatible, &compile)
+	options.NeedDoArkTsLinter = core.TSTrue
+	options.OhRuntimeOS = "HarmonyOS"
+	options.OhDeviceTypes = nil
+	options.OhOriginCompatibleSdkVersion = "5.0.5(17)"
+	options.OhSdkCheckPlugins = []core.OhSdkCheckPlugin{{
+		OSName: "HarmonyOS", Tag: "since", Type: "CompatibilityCheck",
+		Path: "/sdk/since-checker.js", FunctionName: "checkSinceValue",
+	}}
+	options.SetOhSdkPluginExecutor(harmonySDKPluginExecutor{})
+	program := newOHSDKProgramWithOptions(fs, []string{"/sdk/@ohos.sample.d.ts", "/project/entry/src/main/ets/entry.ets"}, options)
+	if diagnostics := ohSDKDiagnostics(program.GetArkTSLinterDiagnostics(t.Context(), nil)); len(diagnostics) != 0 {
+		t.Fatalf("ArkTS linter external since-checker diagnostics = %v", diagnosticTexts(diagnostics))
+	}
+}
+
 // checkFormatResult and validateApiAvailableArgument delegate HarmonyOS
 // annotation/distribution formats to the functions registered from the SDK.
 func TestOHSDKExternalFormatAndDistributionCheckers(t *testing.T) {
