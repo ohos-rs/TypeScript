@@ -204,6 +204,7 @@ func (d *astDecoder) createChildrenNode(kind ast.Kind, data uint32, childIndices
 		ast.KindSatisfiesKeyword,
 		ast.KindSetKeyword,
 		ast.KindTypeKeyword,
+		ast.KindLazyKeyword,
 		ast.KindUniqueKeyword,
 		ast.KindUsingKeyword,
 		ast.KindFromKeyword,
@@ -1090,8 +1091,9 @@ func (d *astDecoder) createChildrenNode(kind ast.Kind, data uint32, childIndices
 		typeArguments := d.nodeListAt(it.nextIf(mask, 3))
 		return d.factory.NewImportTypeNode(isTypeOf, argument, attributes, qualifier, typeArguments), nil
 	case ast.KindImportClause:
+		isLazy := commonData&1 != 0
 		var phaseModifier ast.Kind
-		switch commonData & 3 {
+		switch (commonData >> 1) & 3 {
 		case 1:
 			phaseModifier = ast.KindTypeKeyword
 		case 2:
@@ -1100,7 +1102,7 @@ func (d *astDecoder) createChildrenNode(kind ast.Kind, data uint32, childIndices
 		it := newChildIter(childIndices)
 		name := d.nodeAt(it.nextIf(mask, 0))
 		namedBindings := d.nodeAt(it.nextIf(mask, 1))
-		return d.factory.NewImportClause(phaseModifier, name, namedBindings), nil
+		return d.factory.NewImportClause(phaseModifier, isLazy, name, namedBindings), nil
 	case ast.KindImportSpecifier:
 		isTypeOnly := commonData&1 != 0
 		it := newChildIter(childIndices)

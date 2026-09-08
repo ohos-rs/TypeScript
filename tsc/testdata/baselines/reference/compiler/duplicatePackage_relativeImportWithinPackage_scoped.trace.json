@@ -22,6 +22,8 @@ File '/node_modules/a/package.json' does not exist.
 File '/node_modules/a.ts' does not exist.
 File '/node_modules/a.tsx' does not exist.
 File '/node_modules/a.d.ts' does not exist.
+File '/node_modules/a.ets' does not exist.
+File '/node_modules/a.d.ets' does not exist.
 File '/node_modules/a/index.ts' does not exist.
 File '/node_modules/a/index.tsx' does not exist.
 File '/node_modules/a/index.d.ts' exists - use it as a name resolution result.
@@ -49,6 +51,8 @@ Found 'package.json' at '/node_modules/a/node_modules/@foo/bar/package.json'.
 File '/node_modules/a/node_modules/@foo/bar.ts' does not exist.
 File '/node_modules/a/node_modules/@foo/bar.tsx' does not exist.
 File '/node_modules/a/node_modules/@foo/bar.d.ts' does not exist.
+File '/node_modules/a/node_modules/@foo/bar.ets' does not exist.
+File '/node_modules/a/node_modules/@foo/bar.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.

@@ -33,6 +33,8 @@ exports.SyscapChecker = class {
       checkResult: syscapCheckerConstructions === 1 && node.getText() === 'current' &&
         declaration.getText().includes('declare function current') &&
         projectConfig.runtimeOS === 'HarmonyOS' &&
+        projectConfig.customPluginValue === 'preserved' &&
+        projectConfig.strictMode.apiCompatibilityCheck === 'warning' &&
         projectConfig.syscapIntersectionSet.has('SystemCapability.Base') &&
         projectConfig.syscapUnionSet.has('SystemCapability.Extension'),
       checkMessage: 'syscap'
@@ -71,6 +73,16 @@ exports.SyscapChecker = class {
 	if err != nil || found {
 		t.Fatalf("missing export found %v, error %v", found, err)
 	}
+	missingModule := core.OhSdkCheckPlugin{Path: filepath.Join(t.TempDir(), "missing.cjs"), FunctionName: "check"}
+	if _, found, err = executor.CheckValue(missingModule, "1", "1", 0); err != nil || found {
+		t.Fatalf("value load failure found %v, error %v", found, err)
+	}
+	if _, found, err = executor.CheckDistribution(missingModule, "1"); err == nil || found {
+		t.Fatalf("distribution load failure found %v, error %v", found, err)
+	}
+	if _, found, err = executor.MatchBuildVersion(missingModule, "1"); err == nil || found {
+		t.Fatalf("regex load failure found %v, error %v", found, err)
+	}
 	repoRoot, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
@@ -92,10 +104,12 @@ exports.SyscapChecker = class {
 			FileName: "/sdk/api.d.ts", Source: declarationSource,
 			Pos: 0, End: len(declarationSource), Text: declarationSource,
 		},
-		ProjectConfig: core.OhSdkPluginProjectConfig{
-			RuntimeOS: "HarmonyOS", EtsLoaderPath: repoRoot,
-			SyscapIntersection: []string{"SystemCapability.Base"},
-			SyscapUnion:        []string{"SystemCapability.Extension"},
+		ProjectConfig: map[string]any{
+			"runtimeOS": "HarmonyOS", "etsLoaderPath": repoRoot,
+			"customPluginValue":     "preserved",
+			"strictMode":            map[string]any{"apiCompatibilityCheck": "warning"},
+			"syscapIntersectionSet": []string{"SystemCapability.Base"},
+			"syscapUnionSet":        []string{"SystemCapability.Extension"},
 		},
 	})
 	if err != nil || !found || !syscap.CheckResult || syscap.CheckMessage != "syscap" {

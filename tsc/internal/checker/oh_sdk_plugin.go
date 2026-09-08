@@ -34,7 +34,7 @@ func (c *Checker) ohSdkValuePlugins(tag string) []core.OhSdkCheckPlugin {
 }
 
 func (c *Checker) ohSdkCheckValue(tag string, required string, target string, scene int) (core.OhSdkPluginCheckResult, bool) {
-	executor := c.compilerOptions.OhSdkPluginExecutor
+	executor := c.compilerOptions.GetOhSdkPluginExecutor()
 	if executor == nil {
 		return core.OhSdkPluginCheckResult{}, false
 	}
@@ -51,7 +51,7 @@ func (c *Checker) ohSdkCheckValue(tag string, required string, target string, sc
 }
 
 func (c *Checker) ohSdkCheckFormat(tag string, version string) (core.OhSdkPluginCheckResult, bool) {
-	executor := c.compilerOptions.OhSdkPluginExecutor
+	executor := c.compilerOptions.GetOhSdkPluginExecutor()
 	if executor == nil {
 		return core.OhSdkPluginCheckResult{}, false
 	}
@@ -68,26 +68,29 @@ func (c *Checker) ohSdkCheckFormat(tag string, version string) (core.OhSdkPlugin
 }
 
 func (c *Checker) ohSdkCheckDistribution(tag string, version string) (core.OhSdkPluginDistributionResult, bool) {
-	executor := c.compilerOptions.OhSdkPluginExecutor
+	executor := c.compilerOptions.GetOhSdkPluginExecutor()
 	if executor == nil {
 		return core.OhSdkPluginDistributionResult{}, false
 	}
+	result := core.OhSdkPluginDistributionResult{}
+	configured := false
 	for _, plugin := range c.ohSdkPlugins(tag, "") {
-		result, found, err := executor.CheckDistribution(plugin, version)
+		current, found, err := executor.CheckDistribution(plugin, version)
 		if err != nil {
-			// isCheckDistributionOSVersion catches callback errors and returns its
-			// initial invalid result without trying another registered function.
-			return core.OhSdkPluginDistributionResult{}, false
+			// isCheckDistributionOSVersion returns the value retained from the
+			// preceding callback when a later load/invocation throws.
+			return result, configured
 		}
 		if found {
-			return result, true
+			configured = true
+			result = current
 		}
 	}
-	return core.OhSdkPluginDistributionResult{}, false
+	return result, configured
 }
 
 func (c *Checker) ohSdkMatchBuildVersion(tag string, version string) (core.OhSdkPluginRegexResult, bool) {
-	executor := c.compilerOptions.OhSdkPluginExecutor
+	executor := c.compilerOptions.GetOhSdkPluginExecutor()
 	if executor == nil {
 		return core.OhSdkPluginRegexResult{}, false
 	}
@@ -106,7 +109,7 @@ func (c *Checker) ohSdkMatchBuildVersion(tag string, version string) (core.OhSdk
 }
 
 func (c *Checker) ohSdkCheckSyscap(node *ast.Node, declaration *ast.Node) (core.OhSdkPluginSyscapResult, bool) {
-	executor := c.compilerOptions.OhSdkPluginExecutor
+	executor := c.compilerOptions.GetOhSdkPluginExecutor()
 	if executor == nil {
 		return core.OhSdkPluginSyscapResult{}, false
 	}
@@ -152,25 +155,34 @@ func ohSdkPluginNodeSnapshot(node *ast.Node) core.OhSdkPluginNodeSnapshot {
 	}
 }
 
-func (c *Checker) ohSdkPluginProjectConfig() core.OhSdkPluginProjectConfig {
-	return core.OhSdkPluginProjectConfig{
-		RuntimeOS:                  c.ohRuntimeOS(),
-		OriginCompatibleSdkVersion: c.compilerOptions.OhOriginCompatibleSdkVersion,
-		CompatibleSdkVersion:       c.compilerOptions.CompatibleSdkVersion,
-		CompileSdkVersion:          c.compilerOptions.CompileSdkVersion,
-		ProjectRootPath:            c.compilerOptions.OhProjectRootPath,
-		ProjectPath:                c.compilerOptions.OhProjectPath,
-		ModulePath:                 c.compilerOptions.OhModulePath,
-		EtsLoaderPath:              c.compilerOptions.EtsLoaderPath,
-		ExternalApiPaths:           c.compilerOptions.OhExternalApiPaths,
-		RequestPermissions:         c.compilerOptions.OhRequestPermissions,
-		SyscapIntersection:         c.compilerOptions.OhSyscapIntersection,
-		SyscapUnion:                c.compilerOptions.OhSyscapUnion,
-		DeviceTypes:                c.compilerOptions.OhDeviceTypes,
-		Crossplatform:              c.compilerOptions.OhCrossplatform,
-		IgnoreCrossplatformCheck:   c.compilerOptions.OhIgnoreCrossplatformCheck,
-		CompileMode:                c.compilerOptions.OhCompileMode,
-		BundleType:                 c.compilerOptions.OhBundleType,
-		ApiCompatibilityCheck:      c.compilerOptions.OhApiCompatibilityCheck,
+func (c *Checker) ohSdkPluginProjectConfig() map[string]any {
+	if source := c.compilerOptions.OhSdkPluginProjectConfig; source != nil {
+		result := make(map[string]any, len(source))
+		for key, value := range source {
+			result[key] = value
+		}
+		return result
+	}
+	return map[string]any{
+		"runtimeOS":                  c.ohRuntimeOS(),
+		"originCompatibleSdkVersion": c.compilerOptions.OhOriginCompatibleSdkVersion,
+		"compatibleSdkVersion":       c.compilerOptions.CompatibleSdkVersion,
+		"compileSdkVersion":          c.compilerOptions.CompileSdkVersion,
+		"projectRootPath":            c.compilerOptions.OhProjectRootPath,
+		"projectPath":                c.compilerOptions.OhProjectPath,
+		"modulePath":                 c.compilerOptions.OhModulePath,
+		"etsLoaderPath":              c.compilerOptions.EtsLoaderPath,
+		"externalApiPaths":           c.compilerOptions.OhExternalApiPaths,
+		"requestPermissions":         c.compilerOptions.OhRequestPermissions,
+		"syscapIntersectionSet":      c.compilerOptions.OhSyscapIntersection,
+		"syscapUnionSet":             c.compilerOptions.OhSyscapUnion,
+		"deviceTypes":                c.compilerOptions.OhDeviceTypes,
+		"isCrossplatform":            c.compilerOptions.OhCrossplatform == core.TSTrue,
+		"ignoreCrossplatformCheck":   c.compilerOptions.OhIgnoreCrossplatformCheck == core.TSTrue,
+		"compileMode":                c.compilerOptions.OhCompileMode,
+		"bundleType":                 c.compilerOptions.OhBundleType,
+		"strictMode": map[string]any{
+			"apiCompatibilityCheck": c.compilerOptions.OhApiCompatibilityCheck,
+		},
 	}
 }

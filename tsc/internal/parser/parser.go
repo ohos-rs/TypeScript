@@ -2344,10 +2344,17 @@ func (p *Parser) parseImportDeclarationOrImportEqualsDeclaration(pos int, jsdoc 
 		identifier = p.parseIdentifier()
 	}
 	phaseModifier := ast.KindUnknown
+	isLazy := false
 	if identifier != nil && identifier.Text() == "type" &&
 		(p.token != ast.KindFromKeyword || p.isIdentifier() && p.lookAhead((*Parser).nextTokenIsFromKeywordOrEqualsToken)) &&
 		(p.isIdentifier() || p.tokenAfterImportDefinitelyProducesImportDeclaration()) {
 		phaseModifier = ast.KindTypeKeyword
+		identifier = nil
+		if p.isIdentifier() {
+			identifier = p.parseIdentifier()
+		}
+	} else if p.isSetLazyImport(identifier) {
+		isLazy = true
 		identifier = nil
 		if p.isIdentifier() {
 			identifier = p.parseIdentifier()
@@ -2373,6 +2380,9 @@ func (p *Parser) parseImportDeclarationOrImportEqualsDeclaration(pos int, jsdoc 
 		return importEquals
 	}
 	importClause := p.tryParseImportClause(identifier, afterImportPos, phaseModifier, false /*skipJSDocLeadingAsterisks*/)
+	if importClause != nil {
+		importClause.AsImportClause().IsLazy = isLazy
+	}
 	p.statementHasAwaitIdentifier = saveHasAwaitIdentifier // import clause is always parsed in an Await context
 	moduleSpecifier := p.parseModuleSpecifier()
 	attributes := p.tryParseImportAttributes()
@@ -2381,6 +2391,29 @@ func (p *Parser) parseImportDeclarationOrImportEqualsDeclaration(pos int, jsdoc 
 	p.withJSDoc(result, jsdoc)
 	p.checkJSSyntax(result)
 	return result
+}
+
+// OpenHarmony parser.ts::isSetLazy accepts only the three supported forms:
+// named bindings, a default binding, or a default binding followed by named
+// bindings. A namespace import deliberately remains an ordinary binding named
+// "lazy" and is diagnosed by the normal import grammar.
+func (p *Parser) isSetLazyImport(identifier *ast.Node) bool {
+	if identifier == nil || identifier.Text() != "lazy" {
+		return false
+	}
+	if p.token == ast.KindOpenBraceToken {
+		return true
+	}
+	if !p.isIdentifier() {
+		return false
+	}
+	return p.lookAhead(func(p *Parser) bool {
+		p.nextToken()
+		if p.token == ast.KindFromKeyword {
+			return true
+		}
+		return p.token == ast.KindCommaToken && p.nextToken() == ast.KindOpenBraceToken
+	})
 }
 
 func (p *Parser) nextTokenIsFromKeywordOrEqualsToken() bool {
@@ -2472,7 +2505,7 @@ func (p *Parser) parseImportClause(identifier *ast.Node, pos int, phaseModifier 
 			p.scanner.SetSkipJSDocLeadingAsterisks(false)
 		}
 	}
-	result := p.finishNode(p.factory.NewImportClause(phaseModifier, identifier, namedBindings), pos)
+	result := p.finishNode(p.factory.NewImportClause(phaseModifier, false, identifier, namedBindings), pos)
 	p.statementHasAwaitIdentifier = saveHasAwaitIdentifier
 	return result
 }

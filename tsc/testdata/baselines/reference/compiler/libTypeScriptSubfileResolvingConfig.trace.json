@@ -8,6 +8,8 @@ Searching all ancestor node_modules directories for preferred extensions: TypeSc
 File '/somepath/node_modules/@typescript/lib-decorators.ts' does not exist.
 File '/somepath/node_modules/@typescript/lib-decorators.tsx' does not exist.
 File '/somepath/node_modules/@typescript/lib-decorators.d.ts' does not exist.
+File '/somepath/node_modules/@typescript/lib-decorators.ets' does not exist.
+File '/somepath/node_modules/@typescript/lib-decorators.d.ets' does not exist.
 Directory '/somepath/node_modules/@types' does not exist, skipping all lookups in it.
 Directory '/node_modules' does not exist, skipping all lookups in it.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript, JSON.
@@ -38,6 +40,8 @@ File '/somepath/node_modules/@typescript/lib-dom/package.json' does not exist.
 File '/somepath/node_modules/@typescript/lib-dom.ts' does not exist.
 File '/somepath/node_modules/@typescript/lib-dom.tsx' does not exist.
 File '/somepath/node_modules/@typescript/lib-dom.d.ts' does not exist.
+File '/somepath/node_modules/@typescript/lib-dom.ets' does not exist.
+File '/somepath/node_modules/@typescript/lib-dom.d.ets' does not exist.
 File '/somepath/node_modules/@typescript/lib-dom/index.ts' does not exist.
 File '/somepath/node_modules/@typescript/lib-dom/index.tsx' does not exist.
 File '/somepath/node_modules/@typescript/lib-dom/index.d.ts' exists - use it as a name resolution result.
@@ -90,6 +94,8 @@ Searching all ancestor node_modules directories for preferred extensions: TypeSc
 File '/somepath/node_modules/@typescript/lib-es2015.ts' does not exist.
 File '/somepath/node_modules/@typescript/lib-es2015.tsx' does not exist.
 File '/somepath/node_modules/@typescript/lib-es2015.d.ts' does not exist.
+File '/somepath/node_modules/@typescript/lib-es2015.ets' does not exist.
+File '/somepath/node_modules/@typescript/lib-es2015.d.ets' does not exist.
 Directory '/somepath/node_modules/@types' does not exist, skipping all lookups in it.
 Directory '/node_modules' does not exist, skipping all lookups in it.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript, JSON.
@@ -191,6 +197,8 @@ Searching all ancestor node_modules directories for preferred extensions: TypeSc
 File '/somepath/node_modules/@typescript/lib-es5.ts' does not exist.
 File '/somepath/node_modules/@typescript/lib-es5.tsx' does not exist.
 File '/somepath/node_modules/@typescript/lib-es5.d.ts' does not exist.
+File '/somepath/node_modules/@typescript/lib-es5.ets' does not exist.
+File '/somepath/node_modules/@typescript/lib-es5.d.ets' does not exist.
 Directory '/somepath/node_modules/@types' does not exist, skipping all lookups in it.
 Directory '/node_modules' does not exist, skipping all lookups in it.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript, JSON.
@@ -208,6 +216,8 @@ Searching all ancestor node_modules directories for preferred extensions: TypeSc
 File '/somepath/node_modules/@typescript/lib-es6.ts' does not exist.
 File '/somepath/node_modules/@typescript/lib-es6.tsx' does not exist.
 File '/somepath/node_modules/@typescript/lib-es6.d.ts' does not exist.
+File '/somepath/node_modules/@typescript/lib-es6.ets' does not exist.
+File '/somepath/node_modules/@typescript/lib-es6.d.ets' does not exist.
 Directory '/somepath/node_modules/@types' does not exist, skipping all lookups in it.
 Directory '/node_modules' does not exist, skipping all lookups in it.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript, JSON.
@@ -225,6 +235,8 @@ Searching all ancestor node_modules directories for preferred extensions: TypeSc
 File '/somepath/node_modules/@typescript/lib-scripthost.ts' does not exist.
 File '/somepath/node_modules/@typescript/lib-scripthost.tsx' does not exist.
 File '/somepath/node_modules/@typescript/lib-scripthost.d.ts' does not exist.
+File '/somepath/node_modules/@typescript/lib-scripthost.ets' does not exist.
+File '/somepath/node_modules/@typescript/lib-scripthost.d.ets' does not exist.
 Directory '/somepath/node_modules/@types' does not exist, skipping all lookups in it.
 Directory '/node_modules' does not exist, skipping all lookups in it.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript, JSON.

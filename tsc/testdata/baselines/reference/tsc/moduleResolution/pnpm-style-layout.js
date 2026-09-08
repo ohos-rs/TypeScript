@@ -124,6 +124,8 @@ Found 'package.json' at '/home/src/projects/component-type-checker/packages/app/
 File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/sdk.ts' does not exist.
 File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/sdk.tsx' does not exist.
 File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/sdk.d.ts' does not exist.
+File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/sdk.ets' does not exist.
+File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/sdk.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
@@ -144,6 +146,8 @@ Found 'package.json' at '/home/src/projects/component-type-checker/packages/app/
 File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/components.ts' does not exist.
 File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/components.tsx' does not exist.
 File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/components.d.ts' does not exist.
+File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/components.ets' does not exist.
+File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/components.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
@@ -167,6 +171,8 @@ Found 'package.json' at '/home/src/projects/component-type-checker/packages/app/
 File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/button.ts' does not exist.
 File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/button.tsx' does not exist.
 File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/button.d.ts' does not exist.
+File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/button.ets' does not exist.
+File '/home/src/projects/component-type-checker/packages/app/node_modules/@component-type-checker/button.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
@@ -187,6 +193,8 @@ Found 'package.json' at '/home/src/projects/component-type-checker/packages/sdk/
 File '/home/src/projects/component-type-checker/packages/sdk/node_modules/@component-type-checker/components.ts' does not exist.
 File '/home/src/projects/component-type-checker/packages/sdk/node_modules/@component-type-checker/components.tsx' does not exist.
 File '/home/src/projects/component-type-checker/packages/sdk/node_modules/@component-type-checker/components.d.ts' does not exist.
+File '/home/src/projects/component-type-checker/packages/sdk/node_modules/@component-type-checker/components.ets' does not exist.
+File '/home/src/projects/component-type-checker/packages/sdk/node_modules/@component-type-checker/components.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
@@ -212,6 +220,8 @@ File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-ty
 File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-type-checker+components@0.0.1_@component-type-checker+button@0.0.1/node_modules/@component-type-checker/button.ts' does not exist.
 File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-type-checker+components@0.0.1_@component-type-checker+button@0.0.1/node_modules/@component-type-checker/button.tsx' does not exist.
 File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-type-checker+components@0.0.1_@component-type-checker+button@0.0.1/node_modules/@component-type-checker/button.d.ts' does not exist.
+File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-type-checker+components@0.0.1_@component-type-checker+button@0.0.1/node_modules/@component-type-checker/button.ets' does not exist.
+File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-type-checker+components@0.0.1_@component-type-checker+button@0.0.1/node_modules/@component-type-checker/button.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
@@ -234,6 +244,8 @@ File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-ty
 File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-type-checker+components@0.0.1_@component-type-checker+button@0.0.2/node_modules/@component-type-checker/button.ts' does not exist.
 File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-type-checker+components@0.0.1_@component-type-checker+button@0.0.2/node_modules/@component-type-checker/button.tsx' does not exist.
 File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-type-checker+components@0.0.1_@component-type-checker+button@0.0.2/node_modules/@component-type-checker/button.d.ts' does not exist.
+File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-type-checker+components@0.0.1_@component-type-checker+button@0.0.2/node_modules/@component-type-checker/button.ets' does not exist.
+File '/home/src/projects/component-type-checker/node_modules/.pnpm/@component-type-checker+components@0.0.1_@component-type-checker+button@0.0.2/node_modules/@component-type-checker/button.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.

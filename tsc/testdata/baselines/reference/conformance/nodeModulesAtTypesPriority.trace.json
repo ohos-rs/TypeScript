@@ -10,16 +10,23 @@ File '/packages/a/node_modules/react/package.json' does not exist.
 File '/packages/a/node_modules/react.ts' does not exist.
 File '/packages/a/node_modules/react.tsx' does not exist.
 File '/packages/a/node_modules/react.d.ts' does not exist.
+File '/packages/a/node_modules/react.ets' does not exist.
+File '/packages/a/node_modules/react.d.ets' does not exist.
 File '/packages/a/node_modules/react/index.ts' does not exist.
 File '/packages/a/node_modules/react/index.tsx' does not exist.
 File '/packages/a/node_modules/react/index.d.ts' does not exist.
+File '/packages/a/node_modules/react/index.ets' does not exist.
+File '/packages/a/node_modules/react/index.d.ets' does not exist.
 Directory '/packages/a/node_modules/@types' does not exist, skipping all lookups in it.
 Directory '/packages/node_modules' does not exist, skipping all lookups in it.
 File '/node_modules/react.ts' does not exist.
 File '/node_modules/react.tsx' does not exist.
 File '/node_modules/react.d.ts' does not exist.
+File '/node_modules/react.ets' does not exist.
+File '/node_modules/react.d.ets' does not exist.
 File '/node_modules/@types/react/package.json' does not exist.
 File '/node_modules/@types/react.d.ts' does not exist.
+File '/node_modules/@types/react.d.ets' does not exist.
 File '/node_modules/@types/react/index.d.ts' exists - use it as a name resolution result.
 Resolving real path for '/node_modules/@types/react/index.d.ts', result '/node_modules/@types/react/index.d.ts'.
 ======== Module name 'react' was successfully resolved to '/node_modules/@types/react/index.d.ts'. ========
@@ -35,6 +42,8 @@ File '/packages/a/node_modules/redux/package.json' does not exist.
 File '/packages/a/node_modules/redux.ts' does not exist.
 File '/packages/a/node_modules/redux.tsx' does not exist.
 File '/packages/a/node_modules/redux.d.ts' does not exist.
+File '/packages/a/node_modules/redux.ets' does not exist.
+File '/packages/a/node_modules/redux.d.ets' does not exist.
 File '/packages/a/node_modules/redux/index.ts' does not exist.
 File '/packages/a/node_modules/redux/index.tsx' does not exist.
 File '/packages/a/node_modules/redux/index.d.ts' exists - use it as a name resolution result.

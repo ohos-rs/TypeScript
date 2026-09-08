@@ -84,6 +84,7 @@ var textToKeyword = map[string]ast.Kind{
 	"intrinsic":   ast.KindIntrinsicKeyword,
 	"is":          ast.KindIsKeyword,
 	"keyof":       ast.KindKeyOfKeyword,
+	"lazy":        ast.KindLazyKeyword,
 	"let":         ast.KindLetKeyword,
 	"module":      ast.KindModuleKeyword,
 	"namespace":   ast.KindNamespaceKeyword,

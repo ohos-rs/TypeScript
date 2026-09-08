@@ -6,6 +6,7 @@ Looking up in 'node_modules' folder, initial location '/app'.
 Searching all ancestor node_modules directories for preferred extensions: Declaration.
 File '/app/node_modules/linked/package.json' does not exist.
 File '/app/node_modules/linked.d.ts' does not exist.
+File '/app/node_modules/linked.d.ets' does not exist.
 File '/app/node_modules/linked/index.d.ts' exists - use it as a name resolution result.
 ======== Type reference directive 'linked' was successfully resolved to '/app/node_modules/linked/index.d.ts', primary: false. ========
 ======== Resolving module 'linked' from '/app/app.ts'. ========
@@ -19,6 +20,8 @@ File '/app/node_modules/linked/package.json' does not exist according to earlier
 File '/app/node_modules/linked.ts' does not exist.
 File '/app/node_modules/linked.tsx' does not exist.
 File '/app/node_modules/linked.d.ts' does not exist according to earlier cached lookups.
+File '/app/node_modules/linked.ets' does not exist.
+File '/app/node_modules/linked.d.ets' does not exist according to earlier cached lookups.
 File '/app/node_modules/linked/index.ts' does not exist.
 File '/app/node_modules/linked/index.tsx' does not exist.
 File '/app/node_modules/linked/index.d.ts' exists - use it as a name resolution result.
@@ -34,6 +37,8 @@ File '/app/node_modules/linked2/package.json' does not exist.
 File '/app/node_modules/linked2.ts' does not exist.
 File '/app/node_modules/linked2.tsx' does not exist.
 File '/app/node_modules/linked2.d.ts' does not exist.
+File '/app/node_modules/linked2.ets' does not exist.
+File '/app/node_modules/linked2.d.ets' does not exist.
 File '/app/node_modules/linked2/index.ts' does not exist.
 File '/app/node_modules/linked2/index.tsx' does not exist.
 File '/app/node_modules/linked2/index.d.ts' exists - use it as a name resolution result.
@@ -52,6 +57,8 @@ File '/app/node_modules/real/package.json' does not exist.
 File '/app/node_modules/real.ts' does not exist.
 File '/app/node_modules/real.tsx' does not exist.
 File '/app/node_modules/real.d.ts' does not exist.
+File '/app/node_modules/real.ets' does not exist.
+File '/app/node_modules/real.d.ets' does not exist.
 File '/app/node_modules/real/index.ts' does not exist.
 File '/app/node_modules/real/index.tsx' does not exist.
 File '/app/node_modules/real/index.d.ts' exists - use it as a name resolution result.
@@ -70,6 +77,8 @@ File '/app/node_modules/real/package.json' does not exist according to earlier c
 File '/app/node_modules/real.ts' does not exist according to earlier cached lookups.
 File '/app/node_modules/real.tsx' does not exist according to earlier cached lookups.
 File '/app/node_modules/real.d.ts' does not exist according to earlier cached lookups.
+File '/app/node_modules/real.ets' does not exist according to earlier cached lookups.
+File '/app/node_modules/real.d.ets' does not exist according to earlier cached lookups.
 File '/app/node_modules/real/index.ts' does not exist according to earlier cached lookups.
 File '/app/node_modules/real/index.tsx' does not exist according to earlier cached lookups.
 File '/app/node_modules/real/index.d.ts' exists - use it as a name resolution result.

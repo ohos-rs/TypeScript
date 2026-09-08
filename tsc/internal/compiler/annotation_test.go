@@ -235,3 +235,53 @@ func TestArkUIAnnotationChecking(t *testing.T) {
 		})
 	}
 }
+
+// OH annotationApplicationError13, annotationDeclarationError2, and
+// AnnotationDeclarationNegative19 have one placement diagnostic and no
+// temporal-dead-zone cascade for an annotation declaration annotating itself.
+func TestArkUIAnnotationSelfApplicationDoesNotCascade(t *testing.T) {
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/input.ets": "@A\n@interface A {}",
+	}, true))
+	options := &core.CompilerOptions{EtsAnnotationsEnable: core.TSTrue, NoEmit: core.TSTrue}
+	program := compiler.NewProgram(compiler.ProgramOptions{
+		Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{FileNames: []string{"/input.ets"}, CompilerOptions: options}},
+		Host:   compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+	})
+	diagnostics := program.GetSemanticDiagnostics(t.Context(), nil)
+	if len(diagnostics) != 1 || diagnostics[0].Code() != 28026 {
+		t.Fatalf("diagnostics = %v, want only TS28026", diagnostics)
+	}
+}
+
+// OH retentionError1 covers the complete SDK Retention contract in one
+// multi-file program, including target validation and BYTECODE policy.
+func TestArkUIRetentionCorpusContract(t *testing.T) {
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/@arkts.lang.d.ets": `export const enum RetentionPolicy { SOURCE='source', BYTECODE='bytecode' }
+export @interface Retention { policy: RetentionPolicy }`,
+		"/A.ets": `import { RetentionPolicy, Retention } from "./@arkts.lang";
+@Retention({policy: RetentionPolicy.SOURCE}) class A {}
+@Retention @interface Anno1 {}
+@Retention({policy: RetentionPolicy.SOURCE}) @interface Anno2 { value: number }
+@Retention({policy: RetentionPolicy.BYTECODE}) @interface Anno3 { value: number }
+@Anno3({value: 2}) let b = 2;`,
+	}, true))
+	options := &core.CompilerOptions{
+		EtsAnnotationsEnable: core.TSTrue, NoEmit: core.TSTrue,
+		Strict: core.TSFalse,
+		Module: core.ModuleKindESNext, Target: core.ScriptTargetESNext, ModuleResolution: core.ModuleResolutionKindBundler,
+	}
+	program := compiler.NewProgram(compiler.ProgramOptions{
+		Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{FileNames: []string{"/A.ets"}, CompilerOptions: options}},
+		Host:   compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+	})
+	diagnostics := program.GetSemanticDiagnostics(t.Context(), nil)
+	codes := make([]int32, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		codes = append(codes, diagnostic.Code())
+	}
+	if !slices.Equal(codes, []int32{28046, 28019, 28022}) {
+		t.Fatalf("diagnostics = %v (%v)", codes, diagnostics)
+	}
+}

@@ -80,6 +80,7 @@ type resolutionState struct {
 	compilerOptions             *core.CompilerOptions
 	resolvePackageDirectoryOnly bool
 	supportsEts                 bool
+	containingFileSpecified     bool
 
 	// state fields
 	// candidateEndingIsFromConfig is set when the candidate file extension originated from
@@ -271,6 +272,7 @@ func (r *Resolver) ResolveTypeReferenceDirective(
 	}
 
 	state := newResolutionState(typeReferenceDirectiveName, containingDirectory, true /*isTypeReferenceDirective*/, resolutionMode, compilerOptions, redirectedReference, r, traceBuilder)
+	state.containingFileSpecified = containingFile != ""
 	result := state.resolveTypeReferenceDirective(typeRoots, fromConfig, fromInferredTypesContainingFile)
 
 	if traceBuilder != nil {
@@ -599,7 +601,7 @@ func (r *resolutionState) resolveTypeReferenceDirective(typeRoots []string, from
 
 	// Secondary lookup
 	var resolved *resolved
-	if !fromConfig || !fromInferredTypesContainingFile {
+	if (!fromConfig || !fromInferredTypesContainingFile) && r.containingFileSpecified {
 		if r.tracer != nil {
 			message := diagnostics.Looking_up_in_node_modules_folder_initial_location_0
 			if r.compilerOptions.PackageManagerType == "ohpm" {
@@ -613,6 +615,12 @@ func (r *resolutionState) resolveTypeReferenceDirective(typeRoots []string, from
 			candidate := normalizePathForCJSResolution(r.containingDirectory, r.name)
 			resolved = r.nodeLoadModuleByRelativeName(extensionsDeclaration, candidate, true /*considerPackageJson*/)
 		}
+	} else if (!fromConfig || !fromInferredTypesContainingFile) && r.tracer != nil {
+		message := diagnostics.Containing_file_is_not_specified_and_root_directory_cannot_be_determined_skipping_lookup_in_node_modules_folder
+		if r.compilerOptions.PackageManagerType == "ohpm" {
+			message = diagnostics.Containing_file_is_not_specified_and_root_directory_cannot_be_determined_skipping_lookup_in_oh_modules_folder
+		}
+		r.tracer.write(message)
 	} else if r.tracer != nil {
 		r.tracer.write(diagnostics.Resolving_type_reference_directive_for_program_that_specifies_custom_typeRoots_skipping_lookup_in_node_modules_folder)
 	}

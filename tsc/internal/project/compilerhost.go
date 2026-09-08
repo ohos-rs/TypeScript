@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/contentmapper"
 	"github.com/microsoft/TypeScript/tsc/internal/diagnostics"
 	"github.com/microsoft/TypeScript/tsc/internal/locale"
+	"github.com/microsoft/TypeScript/tsc/internal/parser"
 	"github.com/microsoft/TypeScript/tsc/internal/project/logging"
 	"github.com/microsoft/TypeScript/tsc/internal/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/internal/tspath"
@@ -31,6 +32,7 @@ type compilerHost struct {
 	logger               *logging.LogTree
 	contentMapperProject contentmapper.Project
 	contentMapperOnce    sync.Once
+	kitImports           compiler.KitImportProcessor
 }
 
 func newCompilerHost(
@@ -104,7 +106,14 @@ func (c *compilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *ast.Sourc
 	c.ensureAlive()
 	if fh := c.sourceFS.GetFileByPath(opts.FileName, opts.Path); fh != nil {
 		key := NewParseCacheKey(opts, fh.Hash(), fh.Kind())
-		return c.builder.parseCache.Acquire(key, fh)
+		file, _ := c.builder.parseCache.AcquireOrError(key, func() (*ast.SourceFile, error) {
+			parsed := parser.ParseSourceFile(opts, fh.Content(), key.ScriptKind)
+			parsed.Hash = fh.Hash()
+			c.kitImports.Process(parsed, c.sourceFS)
+			binder.BindSourceFile(parsed)
+			return parsed, nil
+		})
+		return file
 	}
 	return nil
 }
@@ -133,9 +142,11 @@ func (c *compilerHost) GetContentMappedSourceFiles(parseOptions ast.SourceFilePa
 			return contentmapper.SourceFiles{}, transformErr
 		}
 		files.Canonical.Hash = key.Hash
+		c.kitImports.Process(files.Canonical, c.sourceFS)
 		binder.BindSourceFile(files.Canonical)
 		for _, supplemental := range files.Supplemental {
 			supplemental.Hash = key.Hash
+			c.kitImports.Process(supplemental, c.sourceFS)
 			binder.BindSourceFile(supplemental)
 		}
 		return files, nil

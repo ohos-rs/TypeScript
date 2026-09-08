@@ -8,6 +8,8 @@ File '/node_modules/@cow/boy/package.json' does not exist.
 File '/node_modules/@cow/boy.ts' does not exist.
 File '/node_modules/@cow/boy.tsx' does not exist.
 File '/node_modules/@cow/boy.d.ts' does not exist.
+File '/node_modules/@cow/boy.ets' does not exist.
+File '/node_modules/@cow/boy.d.ets' does not exist.
 File '/node_modules/@cow/boy/index.ts' does not exist.
 File '/node_modules/@cow/boy/index.tsx' does not exist.
 File '/node_modules/@cow/boy/index.d.ts' exists - use it as a name resolution result.
@@ -22,6 +24,7 @@ Searching all ancestor node_modules directories for preferred extensions: TypeSc
 Scoped package detected, looking in 'be__bop'
 File '/node_modules/@types/be__bop/package.json' does not exist.
 File '/node_modules/@types/be__bop.d.ts' does not exist.
+File '/node_modules/@types/be__bop.d.ets' does not exist.
 File '/node_modules/@types/be__bop/index.d.ts' exists - use it as a name resolution result.
 Resolving real path for '/node_modules/@types/be__bop/index.d.ts', result '/node_modules/@types/be__bop/index.d.ts'.
 ======== Module name '@be/bop' was successfully resolved to '/node_modules/@types/be__bop/index.d.ts'. ========

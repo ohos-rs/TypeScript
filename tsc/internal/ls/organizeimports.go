@@ -285,7 +285,7 @@ func removeUnusedImports(oldImports []*ast.Statement, sourceFile *ast.SourceFile
 
 		if name != nil || namedBindings != nil {
 			importDeclNode := importDecl.AsImportDeclaration()
-			newClause := factory.UpdateImportClause(clause, clause.PhaseModifier, name, namedBindings)
+			newClause := factory.UpdateImportClause(clause, clause.PhaseModifier, clause.IsLazy, name, namedBindings)
 			newImportDecl := factory.UpdateImportDeclaration(
 				importDeclNode,
 				importDeclNode.Modifiers(),
@@ -490,7 +490,7 @@ func coalesceImportsWorker(
 				defaultClause := defaultImport.AsImportDeclaration().ImportClause.AsImportClause()
 				namespaceBindings := namespaceImport.AsImportDeclaration().ImportClause.AsImportClause().NamedBindings
 
-				newClause := factory.UpdateImportClause(defaultClause, defaultClause.PhaseModifier, defaultClause.Name(), namespaceBindings)
+				newClause := factory.UpdateImportClause(defaultClause, defaultClause.PhaseModifier, defaultClause.IsLazy, defaultClause.Name(), namespaceBindings)
 				defaultDeclNode := defaultImport.AsImportDeclaration()
 				newImportDecl := factory.UpdateImportDeclaration(
 					defaultDeclNode,
@@ -512,7 +512,7 @@ func coalesceImportsWorker(
 			for _, nsImport := range group.namespaceImports {
 				nsImportDecl := nsImport.AsImportDeclaration()
 				clause := nsImportDecl.ImportClause.AsImportClause()
-				newClause := factory.UpdateImportClause(clause, clause.PhaseModifier, nil, clause.NamedBindings)
+				newClause := factory.UpdateImportClause(clause, clause.PhaseModifier, clause.IsLazy, nil, clause.NamedBindings)
 				newImportDecl := factory.UpdateImportDeclaration(
 					nsImportDecl,
 					nsImportDecl.Modifiers(),
@@ -590,7 +590,7 @@ func coalesceImportsWorker(
 			if isTypeOnly && newDefaultImport != nil && newNamedImports != nil {
 				importDeclNode := importDecl.AsImportDeclaration()
 
-				defaultClause := factory.NewImportClause(importDeclNode.ImportClause.AsImportClause().PhaseModifier, newDefaultImport, nil)
+				defaultClause := factory.NewImportClause(importDeclNode.ImportClause.AsImportClause().PhaseModifier, importDeclNode.ImportClause.AsImportClause().IsLazy, newDefaultImport, nil)
 				defaultImportDecl := factory.UpdateImportDeclaration(
 					importDeclNode,
 					importDeclNode.Modifiers(),
@@ -605,7 +605,7 @@ func coalesceImportsWorker(
 					namedDeclNode = importDecl
 				}
 				namedImportDeclNode := namedDeclNode.AsImportDeclaration()
-				namedClause := factory.NewImportClause(namedImportDeclNode.ImportClause.AsImportClause().PhaseModifier, nil, newNamedImports)
+				namedClause := factory.NewImportClause(namedImportDeclNode.ImportClause.AsImportClause().PhaseModifier, namedImportDeclNode.ImportClause.AsImportClause().IsLazy, nil, newNamedImports)
 				namedImportDecl := factory.UpdateImportDeclaration(
 					namedImportDeclNode,
 					namedImportDeclNode.Modifiers(),
@@ -617,7 +617,7 @@ func coalesceImportsWorker(
 			} else {
 				importDeclNode := importDecl.AsImportDeclaration()
 				clauseNode := importDeclNode.ImportClause.AsImportClause()
-				newClause := factory.UpdateImportClause(clauseNode, clauseNode.PhaseModifier, newDefaultImport, newNamedImports)
+				newClause := factory.UpdateImportClause(clauseNode, clauseNode.PhaseModifier, clauseNode.IsLazy, newDefaultImport, newNamedImports)
 				newImportDecl := factory.UpdateImportDeclaration(
 					importDeclNode,
 					importDeclNode.Modifiers(),

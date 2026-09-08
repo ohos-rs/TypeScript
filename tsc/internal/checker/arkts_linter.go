@@ -258,12 +258,14 @@ var arkTSFaultAttributes = map[arkTSFault]arkTSFaultAttribute{
 }
 
 type arkTSLinter struct {
-	checker           *Checker
-	file              *ast.SourceFile
-	strictDiagnostics []*ast.Diagnostic
-	diagnostics       []*ast.Diagnostic
-	exported          map[*ast.Node]struct{}
-	kitInfos          map[string]arkTSKitInfo
+	checker            *Checker
+	file               *ast.SourceFile
+	strictDiagnostics  []*ast.Diagnostic
+	diagnostics        []*ast.Diagnostic
+	exported           map[*ast.Node]struct{}
+	kitInfos           map[string]arkTSKitInfo
+	ignoredDirectories []string
+	pathComponents     map[*ast.SourceFile][]string
 }
 
 type arkTSKitInfo struct {
@@ -298,7 +300,13 @@ func (c *Checker) GetArkTSLinterDiagnostics(file *ast.SourceFile, strictDiagnost
 		}
 		strictDiagnostics = linterDiagnostics
 	}
-	linter := arkTSLinter{checker: c, file: file, strictDiagnostics: slices.Clone(strictDiagnostics)}
+	linter := arkTSLinter{
+		checker:            c,
+		file:               file,
+		strictDiagnostics:  slices.Clone(strictDiagnostics),
+		ignoredDirectories: c.arkTSIgnoredDirectories(),
+		pathComponents:     make(map[*ast.SourceFile][]string),
+	}
 	if file.ScriptKind == core.ScriptKindETS {
 		linter.visit(file.AsNode())
 		linter.checkCommentDirectives()
@@ -2482,7 +2490,7 @@ func (l *arkTSLinter) filterLibraryCallDiagnostics(node *ast.Node, calleeSymbol 
 	isOhModulesETS := false
 	if calleeSymbol != nil && len(calleeSymbol.Declarations) > 0 {
 		file := ast.GetSourceFileOfNode(calleeSymbol.Declarations[0])
-		isOhModulesETS = file != nil && file.ScriptKind == core.ScriptKindETS && strings.Contains(strings.ToLower(tspath.NormalizePath(file.FileName())), "/oh_modules/")
+		isOhModulesETS = file != nil && file.ScriptKind == core.ScriptKindETS && l.sourceFilePathContainsDirectory(file, "oh_modules")
 	}
 	allowOHModulesFallback := l.allowOHModulesFallback()
 	hasFiltered := false
@@ -2647,16 +2655,7 @@ func (l *arkTSLinter) isValidLibraryCallArgumentPosition(node *ast.Node, positio
 }
 
 func (l *arkTSLinter) allowOHModulesFallback() bool {
-	paths := l.checker.compilerOptions.DisableStrictCheckPaths
-	if paths == nil {
-		paths = []string{"node_modules", "oh_modules", "build", ".preview"}
-	}
-	for _, path := range paths {
-		if path == "oh_modules" && l.checker.compilerOptions.EnableStrictCheckOHModule != core.TSTrue {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(l.ignoredDirectories, "oh_modules")
 }
 
 func (l *arkTSLinter) handleStdlibAPICall(node *ast.Node, symbol *ast.Symbol) {
@@ -2850,14 +2849,49 @@ func (l *arkTSLinter) isLibrarySymbol(symbol *ast.Symbol) bool {
 	if file == nil || l.checker.program.IsSourceFileDefaultLibrary(file.Path()) {
 		return false
 	}
-	name := strings.ToLower(tspath.NormalizePath(file.FileName()))
-	thirdParty := strings.Contains(name, "/node_modules/") || strings.Contains(name, "/oh_modules/") ||
-		strings.Contains(name, "/build/") || strings.Contains(name, "/.preview/") || tspath.GetBaseFileName(name) == "hvigorfile.ts"
+	thirdParty := l.isThirdPartyFile(file)
 	// Utils.ts::isLibrarySymbol treats only first-party ETS source as static in
 	// production. Ordinary TS, declaration files, and third-party ETS obey the
 	// interop/library rules. The upstream-only testMode exception for .ts files
 	// is intentionally not part of the production compiler API.
 	return file.ScriptKind != core.ScriptKindETS || thirdParty
+}
+
+func (l *arkTSLinter) isThirdPartyFile(file *ast.SourceFile) bool {
+	thirdParty := tspath.GetBaseFileName(file.FileName()) == "hvigorfile.ts"
+	if !thirdParty {
+		for _, directory := range l.ignoredDirectories {
+			if l.sourceFilePathContainsDirectory(file, directory) {
+				thirdParty = true
+				break
+			}
+		}
+	}
+	return thirdParty
+}
+
+func (c *Checker) arkTSIgnoredDirectories() []string {
+	paths := c.compilerOptions.DisableStrictCheckPaths
+	if paths == nil {
+		paths = []string{"node_modules", "oh_modules", "build", ".preview"}
+	}
+	result := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if path == "" || c.compilerOptions.EnableStrictCheckOHModule == core.TSTrue && path == "oh_modules" || slices.Contains(result, path) {
+			continue
+		}
+		result = append(result, path)
+	}
+	return result
+}
+
+func (l *arkTSLinter) sourceFilePathContainsDirectory(file *ast.SourceFile, directory string) bool {
+	components, exists := l.pathComponents[file]
+	if !exists {
+		components = tspath.GetPathComponents(tspath.NormalizePath(file.FileName()), "")
+		l.pathComponents[file] = components
+	}
+	return slices.Contains(components, directory)
 }
 
 func (l *arkTSLinter) isStaticSourceType(t *Type) bool {

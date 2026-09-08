@@ -5,6 +5,8 @@ Loading module as file / folder, candidate module location '/lib', target file t
 File '/lib.ts' does not exist.
 File '/lib.tsx' does not exist.
 File '/lib.d.ts' does not exist.
+File '/lib.ets' does not exist.
+File '/lib.d.ets' does not exist.
 File '/lib.js' does not exist.
 File '/lib.jsx' does not exist.
 Found 'package.json' at '/lib/package.json'.

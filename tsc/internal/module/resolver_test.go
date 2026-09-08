@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/internal/core"
+	"github.com/microsoft/TypeScript/tsc/internal/diagnostics"
 	"github.com/microsoft/TypeScript/tsc/internal/module"
 	"github.com/microsoft/TypeScript/tsc/internal/vfs"
 	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfstest"
@@ -15,6 +16,32 @@ import (
 type resolutionHostStub struct {
 	fs  vfs.FS
 	cwd string
+}
+
+// OpenHarmony moduleNameResolver.ts::resolveTypeReferenceDirective reports the
+// package-manager-specific trace and skips the secondary lookup when no
+// containing file exists. In particular, OHPM must use diagnostic 28009.
+func TestResolveTypeReferenceDirectiveWithoutContainingFileUsesOHPMTrace(t *testing.T) {
+	t.Parallel()
+
+	host := &resolutionHostStub{fs: vfstest.FromMap(map[string]string{}, true), cwd: "/repo"}
+	options := &core.CompilerOptions{
+		ModuleResolution:   core.ModuleResolutionKindBundler,
+		Module:             core.ModuleKindESNext,
+		PackageManagerType: "ohpm",
+		TraceResolution:    core.TSTrue,
+	}
+	resolver := module.NewResolver(host, options, "", "", nil)
+	resolved, traces := resolver.ResolveTypeReferenceDirective("sample", "", core.ModuleKindESNext, nil)
+	if resolved.IsResolved() {
+		t.Fatalf("unexpected resolution: %q", resolved.ResolvedFileName)
+	}
+	for _, trace := range traces {
+		if trace.Message == diagnostics.Containing_file_is_not_specified_and_root_directory_cannot_be_determined_skipping_lookup_in_oh_modules_folder {
+			return
+		}
+	}
+	t.Fatal("missing OpenHarmony no-containing-file trace TS28009")
 }
 
 func (h *resolutionHostStub) FS() vfs.FS                  { return h.fs }

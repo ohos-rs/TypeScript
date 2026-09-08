@@ -375,6 +375,8 @@ func parseCompilerOptions(key string, value any, allOptions *core.CompilerOption
 		}
 	case "etsLoaderPath":
 		allOptions.EtsLoaderPath = ParseString(value)
+	case "noTransformedKitInParser":
+		allOptions.NoTransformedKitInParser = ParseTristate(value)
 	case "tsImportSoCheck":
 		allOptions.TsImportSoCheck = ParseTristate(value)
 	case "needDoArkTsLinter":
@@ -417,6 +419,12 @@ func parseCompilerOptions(key string, value any, allOptions *core.CompilerOption
 		allOptions.StrictCheckerOnly = ParseTristate(value)
 	case "ohSdkConfigs":
 		allOptions.OhSdkConfigs, _ = value.([]core.OhSdkConfig)
+	case "ohSdkCheckPlugins":
+		allOptions.OhSdkCheckPlugins, _ = value.([]core.OhSdkCheckPlugin)
+	case "ohSdkClassCheckPlugins":
+		allOptions.OhSdkClassCheckPlugins, _ = value.([]core.OhSdkClassCheckPlugin)
+	case "ohSdkPluginProjectConfig":
+		allOptions.OhSdkPluginProjectConfig, _ = value.(map[string]any)
 	case "ohSystemModules":
 		allOptions.OhSystemModules = ParseStringArray(value)
 	case "ohSdkConfigPrefixes":

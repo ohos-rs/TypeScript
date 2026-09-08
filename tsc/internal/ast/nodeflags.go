@@ -49,6 +49,9 @@ const (
 	// ArkUI nodes retain the class/call representation used by the checker.
 	NodeFlagsStruct       NodeFlags = 1 << 29
 	NodeFlagsEtsComponent NodeFlags = 1 << 30
+	// OH NodeFlags.KitImportFlags marks parser-created virtual imports whose
+	// source positions refer back to an original @kit import declaration.
+	NodeFlagsKitImport NodeFlags = 1 << 31
 
 	NodeFlagsBlockScoped = NodeFlagsLet | NodeFlagsConst | NodeFlagsUsing
 	NodeFlagsConstant    = NodeFlagsConst | NodeFlagsUsing

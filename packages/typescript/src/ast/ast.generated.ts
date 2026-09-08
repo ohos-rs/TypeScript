@@ -150,6 +150,7 @@ export type KeywordSyntaxKind =
     | SyntaxKind.StringKeyword
     | SyntaxKind.SymbolKeyword
     | SyntaxKind.TypeKeyword
+    | SyntaxKind.LazyKeyword
     | SyntaxKind.UndefinedKeyword
     | SyntaxKind.UniqueKeyword
     | SyntaxKind.UnknownKeyword
@@ -321,6 +322,7 @@ export type TokenSyntaxKind =
     | SyntaxKind.StringKeyword
     | SyntaxKind.SymbolKeyword
     | SyntaxKind.TypeKeyword
+    | SyntaxKind.LazyKeyword
     | SyntaxKind.UndefinedKeyword
     | SyntaxKind.UniqueKeyword
     | SyntaxKind.UnknownKeyword
@@ -1295,6 +1297,7 @@ export interface ImportTypeNode extends NodeWithTypeArgumentsBase {
 export interface ImportClause extends NodeBase, DeclarationBase {
     readonly kind: SyntaxKind.ImportClause;
     readonly phaseModifier?: ImportPhaseModifierSyntaxKind;
+    readonly isLazy: boolean;
     readonly name?: Identifier;
     readonly namedBindings?: NamedImportBindings;
 }

@@ -497,6 +497,10 @@ export class RemoteNode extends RemoteNodeBase implements Node {
         return (this.data & (1 << 24)) !== 0;
     }
 
+    get isLazy(): boolean {
+        return (this.data & (1 << 24)) !== 0;
+    }
+
     get isNameFirst(): boolean {
         return (this.data & (1 << 25)) !== 0;
     }
@@ -554,7 +558,7 @@ export class RemoteNode extends RemoteNodeBase implements Node {
     get phaseModifier(): SyntaxKind | undefined {
         switch (this.kind) {
             case SyntaxKind.ImportClause: {
-                const idx = (this.data >> 24) & 0x3;
+                const idx = (this.data >> 25) & 0x3;
                 if (idx === 0) return undefined;
                 return idx === 1 ? SyntaxKind.TypeKeyword : idx === 2 ? SyntaxKind.DeferKeyword : undefined;
             }

@@ -154,6 +154,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/package.json
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.d.ts' exists - use it as a name resolution result.
@@ -175,6 +177,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/package.json
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/index.d.ts' exists - use it as a name resolution result.
@@ -196,6 +200,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-scripthost/packa
 File '/home/src/workspace/projects/node_modules/@typescript/lib-scripthost.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-scripthost.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-scripthost.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-scripthost.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-scripthost.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-scripthost/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-scripthost/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-scripthost/index.d.ts' exists - use it as a name resolution result.
@@ -217,6 +223,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker/packag
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker/index.d.ts' exists - use it as a name resolution result.
@@ -263,6 +271,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/package.json
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.d.ts' exists - use it as a name resolution result.
@@ -284,6 +294,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/package.json
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/index.d.ts' exists - use it as a name resolution result.
@@ -317,6 +329,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/package.json
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.d.ts' exists - use it as a name resolution result.
@@ -338,6 +352,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/package.json
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-es5.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-es5/index.d.ts' exists - use it as a name resolution result.
@@ -371,6 +387,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/package.json
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-dom.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-dom/index.d.ts' exists - use it as a name resolution result.
@@ -392,6 +410,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-esnext/package.j
 File '/home/src/workspace/projects/node_modules/@typescript/lib-esnext.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-esnext.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-esnext.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-esnext.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-esnext.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-esnext/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-esnext/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-esnext/index.d.ts' exists - use it as a name resolution result.
@@ -413,6 +433,8 @@ File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker/packag
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker.d.ts' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker.ets' does not exist.
+File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker.d.ets' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker/index.ts' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker/index.tsx' does not exist.
 File '/home/src/workspace/projects/node_modules/@typescript/lib-webworker/index.d.ts' exists - use it as a name resolution result.

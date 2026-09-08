@@ -186,6 +186,7 @@
             "StringKeyword",
             "SymbolKeyword",
             "TypeKeyword",
+            "LazyKeyword",
             "UndefinedKeyword",
             "UniqueKeyword",
             "UnknownKeyword",
@@ -4927,6 +4928,10 @@
                         "name": "PhaseModifier",
                         "type": "ImportPhaseModifierSyntaxKind",
                         "optional": true
+                    },
+                    {
+                        "name": "IsLazy",
+                        "type": "bool"
                     },
                     {
                         "name": "name",

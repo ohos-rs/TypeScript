@@ -5,6 +5,8 @@ Loading module as file / folder, candidate module location '/dir', target file t
 File '/dir.ts' does not exist.
 File '/dir.tsx' does not exist.
 File '/dir.d.ts' does not exist.
+File '/dir.ets' does not exist.
+File '/dir.d.ets' does not exist.
 File '/dir.js' does not exist.
 File '/dir.jsx' does not exist.
 File '/dir/package.json' does not exist.
@@ -37,6 +39,8 @@ Loading module as file / folder, candidate module location '/redirect', target f
 File '/redirect.ts' does not exist.
 File '/redirect.tsx' does not exist.
 File '/redirect.d.ts' does not exist.
+File '/redirect.ets' does not exist.
+File '/redirect.d.ets' does not exist.
 File '/redirect.js' does not exist.
 File '/redirect.jsx' does not exist.
 Found 'package.json' at '/redirect/package.json'.
@@ -48,6 +52,8 @@ Loading module as file / folder, candidate module location '/foo', target file t
 File '/foo.ts' does not exist.
 File '/foo.tsx' does not exist.
 File '/foo.d.ts' does not exist.
+File '/foo.ets' does not exist.
+File '/foo.d.ets' does not exist.
 File '/foo.js' does not exist.
 File '/foo.jsx' does not exist.
 File '/foo/index.ts' exists - use it as a name resolution result.
@@ -59,6 +65,8 @@ Loading module as file / folder, candidate module location '/redirect/index', ta
 File '/redirect/index.ts' does not exist.
 File '/redirect/index.tsx' does not exist.
 File '/redirect/index.d.ts' does not exist.
+File '/redirect/index.ets' does not exist.
+File '/redirect/index.d.ets' does not exist.
 File '/redirect/index.js' does not exist.
 File '/redirect/index.jsx' does not exist.
 Directory '/redirect/index' does not exist, skipping all lookups in it.

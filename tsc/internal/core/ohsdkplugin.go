@@ -31,33 +31,10 @@ type OhSdkPluginNodeSnapshot struct {
 	Text     string `json:"text"`
 }
 
-// OhSdkPluginProjectConfig is the projectConfig surface passed verbatim to a
-// class-style SDK checker by api_check_utils.ts::checkSyscapAbility.
-type OhSdkPluginProjectConfig struct {
-	RuntimeOS                  string   `json:"runtimeOS"`
-	OriginCompatibleSdkVersion string   `json:"originCompatibleSdkVersion"`
-	CompatibleSdkVersion       *float64 `json:"compatibleSdkVersion"`
-	CompileSdkVersion          *float64 `json:"compileSdkVersion"`
-	ProjectRootPath            string   `json:"projectRootPath"`
-	ProjectPath                string   `json:"projectPath"`
-	ModulePath                 string   `json:"modulePath"`
-	EtsLoaderPath              string   `json:"etsLoaderPath"`
-	ExternalApiPaths           []string `json:"externalApiPaths"`
-	RequestPermissions         []string `json:"requestPermissions"`
-	SyscapIntersection         []string `json:"syscapIntersection"`
-	SyscapUnion                []string `json:"syscapUnion"`
-	DeviceTypes                []string `json:"deviceTypes"`
-	Crossplatform              Tristate `json:"isCrossplatform"`
-	IgnoreCrossplatformCheck   Tristate `json:"ignoreCrossplatformCheck"`
-	CompileMode                string   `json:"compileMode"`
-	BundleType                 string   `json:"bundleType"`
-	ApiCompatibilityCheck      string   `json:"apiCompatibilityCheck"`
-}
-
 type OhSdkClassCheckRequest struct {
-	Node          OhSdkPluginNodeSnapshot  `json:"node"`
-	Declaration   OhSdkPluginNodeSnapshot  `json:"declaration"`
-	ProjectConfig OhSdkPluginProjectConfig `json:"projectConfig"`
+	Node          OhSdkPluginNodeSnapshot `json:"node"`
+	Declaration   OhSdkPluginNodeSnapshot `json:"declaration"`
+	ProjectConfig map[string]any          `json:"projectConfig"`
 }
 
 type OhSdkPluginCheckResult struct {

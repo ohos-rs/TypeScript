@@ -397,6 +397,7 @@ func getNewImports(
 				/*modifiers*/ nil,
 				ct.NodeFactory.NewImportClause(
 					/*phaseModifier*/ core.IfElse(shouldUseTypeOnly(namespaceLikeImport.addAsTypeOnly, preferences), ast.KindTypeKeyword, ast.KindUnknown),
+					/*isLazy*/ false,
 					/*name*/ nil,
 					ct.NodeFactory.NewNamespaceImport(ct.NodeFactory.NewIdentifier(namespaceLikeImport.name)),
 				),
@@ -547,7 +548,7 @@ func makeImport(ct *change.Tracker, defaultImport *ast.IdentifierNode, namedImpo
 	}
 	var importClause *ast.Node
 	if defaultImport != nil || newNamedImports != nil {
-		importClause = ct.NodeFactory.NewImportClause(core.IfElse(isTypeOnly, ast.KindTypeKeyword, ast.KindUnknown), defaultImport, newNamedImports)
+		importClause = ct.NodeFactory.NewImportClause(core.IfElse(isTypeOnly, ast.KindTypeKeyword, ast.KindUnknown), false, defaultImport, newNamedImports)
 	}
 	return ct.NodeFactory.NewImportDeclaration( /*modifiers*/ nil, importClause, moduleSpecifier, nil /*attributes*/)
 }

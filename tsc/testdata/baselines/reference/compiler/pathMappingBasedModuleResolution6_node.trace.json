@@ -25,6 +25,8 @@ Loading module as file / folder, candidate module location 'c:/root/generated/sr
 File 'c:/root/generated/src/file2.ts' does not exist.
 File 'c:/root/generated/src/file2.tsx' does not exist.
 File 'c:/root/generated/src/file2.d.ts' does not exist.
+File 'c:/root/generated/src/file2.ets' does not exist.
+File 'c:/root/generated/src/file2.d.ets' does not exist.
 File 'c:/root/generated/src/file2.js' does not exist.
 File 'c:/root/generated/src/file2.jsx' does not exist.
 Directory 'c:/root/generated/src/file2' does not exist, skipping all lookups in it.
@@ -34,6 +36,8 @@ Loading module as file / folder, candidate module location 'c:/root/src/file2', 
 File 'c:/root/src/file2.ts' does not exist.
 File 'c:/root/src/file2.tsx' does not exist.
 File 'c:/root/src/file2.d.ts' does not exist.
+File 'c:/root/src/file2.ets' does not exist.
+File 'c:/root/src/file2.d.ets' does not exist.
 File 'c:/root/src/file2.js' does not exist.
 File 'c:/root/src/file2.jsx' does not exist.
 File 'c:/root/src/file2/package.json' does not exist.

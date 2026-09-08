@@ -15,6 +15,7 @@ Failed to resolve under condition 'import'.
 Saw non-matching condition 'require'.
 Exiting conditional exports.
 File '/node_modules/@types/foo.d.ts' does not exist.
+File '/node_modules/@types/foo.d.ets' does not exist.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript, JSON.
 File '/node_modules/foo/package.json' exists according to earlier cached lookups.
 Entering conditional exports.
@@ -34,6 +35,8 @@ File '/node_modules/foo/package.json' exists according to earlier cached lookups
 File '/node_modules/foo.ts' does not exist.
 File '/node_modules/foo.tsx' does not exist.
 File '/node_modules/foo.d.ts' does not exist.
+File '/node_modules/foo.ets' does not exist.
+File '/node_modules/foo.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' has 'types' field 'index.d.ts' that references '/node_modules/foo/index.d.ts'.
@@ -80,6 +83,8 @@ File '/node_modules/bar/package.json' exists according to earlier cached lookups
 File '/node_modules/bar.ts' does not exist.
 File '/node_modules/bar.tsx' does not exist.
 File '/node_modules/bar.d.ts' does not exist.
+File '/node_modules/bar.ets' does not exist.
+File '/node_modules/bar.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
@@ -88,20 +93,29 @@ File name '/node_modules/bar/index.js' has a '.js' extension - stripping it.
 File '/node_modules/bar/index.ts' does not exist.
 File '/node_modules/bar/index.tsx' does not exist.
 File '/node_modules/bar/index.d.ts' does not exist.
+File '/node_modules/bar/index.ets' does not exist.
+File '/node_modules/bar/index.d.ets' does not exist.
 Loading module as file / folder, candidate module location '/node_modules/bar/index.js', target file types: TypeScript, Declaration.
 File name '/node_modules/bar/index.js' has a '.js' extension - stripping it.
 File '/node_modules/bar/index.ts' does not exist according to earlier cached lookups.
 File '/node_modules/bar/index.tsx' does not exist according to earlier cached lookups.
 File '/node_modules/bar/index.d.ts' does not exist according to earlier cached lookups.
+File '/node_modules/bar/index.ets' does not exist according to earlier cached lookups.
+File '/node_modules/bar/index.d.ets' does not exist according to earlier cached lookups.
 File '/node_modules/bar/index.js.ts' does not exist.
 File '/node_modules/bar/index.js.tsx' does not exist.
 File '/node_modules/bar/index.js.d.ts' does not exist.
+File '/node_modules/bar/index.js.ets' does not exist.
+File '/node_modules/bar/index.js.d.ets' does not exist.
 Directory '/node_modules/bar/index.js' does not exist, skipping all lookups in it.
 File '/node_modules/bar/index.ts' does not exist according to earlier cached lookups.
 File '/node_modules/bar/index.tsx' does not exist according to earlier cached lookups.
 File '/node_modules/bar/index.d.ts' does not exist according to earlier cached lookups.
+File '/node_modules/bar/index.ets' does not exist according to earlier cached lookups.
+File '/node_modules/bar/index.d.ets' does not exist according to earlier cached lookups.
 File '/node_modules/@types/bar/package.json' exists according to earlier cached lookups.
 File '/node_modules/@types/bar.d.ts' does not exist.
+File '/node_modules/@types/bar.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' has 'types' field 'index.d.ts' that references '/node_modules/@types/bar/index.d.ts'.

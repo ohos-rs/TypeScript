@@ -70,6 +70,8 @@ File name '/home/src/workspaces/project/packages/a/index.js' has a '.js' extensi
 File '/home/src/workspaces/project/packages/a/index.ts' does not exist.
 File '/home/src/workspaces/project/packages/a/index.tsx' does not exist.
 File '/home/src/workspaces/project/packages/a/index.d.ts' does not exist.
+File '/home/src/workspaces/project/packages/a/index.ets' does not exist.
+File '/home/src/workspaces/project/packages/a/index.d.ets' does not exist.
 File '/home/src/workspaces/project/packages/a/index.js' exists - use it as a name resolution result.
 'package.json' does not have a 'peerDependencies' field.
 Resolved under condition 'types'.

@@ -8,6 +8,8 @@ Loading module as file / folder, candidate module location '/a/b/node_modules/fa
 File '/a/b/node_modules/fake/thing.ts' does not exist.
 File '/a/b/node_modules/fake/thing.tsx' does not exist.
 File '/a/b/node_modules/fake/thing.d.ts' does not exist.
+File '/a/b/node_modules/fake/thing.ets' does not exist.
+File '/a/b/node_modules/fake/thing.d.ets' does not exist.
 File '/a/b/node_modules/fake/thing.js' does not exist.
 File '/a/b/node_modules/fake/thing.jsx' does not exist.
 File '/a/b/node_modules/fake/thing/package.json' does not exist.

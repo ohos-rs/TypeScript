@@ -456,6 +456,9 @@ export class NodeObject {
     get isExportEquals(): any {
         return this._data?.isExportEquals;
     }
+    get isLazy(): any {
+        return this._data?.isLazy;
+    }
     get isNameFirst(): any {
         return this._data?.isNameFirst;
     }
@@ -1115,7 +1118,7 @@ function cloneNodeData(node: Node): any {
         case SyntaxKind.ImportType:
             return { isTypeOf: n.isTypeOf, argument: n.argument, attributes: n.attributes, qualifier: n.qualifier, typeArguments: n.typeArguments };
         case SyntaxKind.ImportClause:
-            return { phaseModifier: n.phaseModifier, name: n.name, namedBindings: n.namedBindings };
+            return { phaseModifier: n.phaseModifier, isLazy: n.isLazy, name: n.name, namedBindings: n.namedBindings };
         case SyntaxKind.ImportSpecifier:
             return { isTypeOnly: n.isTypeOnly, propertyName: n.propertyName, name: n.name };
         case SyntaxKind.JSDocText:
@@ -3029,9 +3032,10 @@ export function createImportTypeNode(isTypeOf: boolean = false, argument: TypeNo
     }) as unknown as ImportTypeNode;
 }
 
-export function createImportClause(phaseModifier?: ImportPhaseModifierSyntaxKind, name?: Identifier, namedBindings?: NamedImportBindings): ImportClause {
+export function createImportClause(phaseModifier?: ImportPhaseModifierSyntaxKind, isLazy?: boolean, name?: Identifier, namedBindings?: NamedImportBindings): ImportClause {
     return new NodeObject(SyntaxKind.ImportClause, {
         phaseModifier,
+        isLazy,
         name,
         namedBindings,
     }) as unknown as ImportClause;
@@ -3779,7 +3783,7 @@ export function updateImportTypeNode(node: ImportTypeNode, argument: TypeNode, a
 }
 
 export function updateImportClause(node: ImportClause, name?: Identifier, namedBindings?: NamedImportBindings): ImportClause {
-    return node.name !== name || node.namedBindings !== namedBindings ? createImportClause(node.phaseModifier, name, namedBindings) : node;
+    return node.name !== name || node.namedBindings !== namedBindings ? createImportClause(node.phaseModifier, node.isLazy, name, namedBindings) : node;
 }
 
 export function updateImportSpecifier(node: ImportSpecifier, propertyName: ModuleExportName | undefined, name: Identifier): ImportSpecifier {

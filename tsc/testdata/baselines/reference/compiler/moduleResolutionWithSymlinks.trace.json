@@ -5,6 +5,8 @@ Loading module as file / folder, candidate module location '/src/library-a', tar
 File '/src/library-a.ts' does not exist.
 File '/src/library-a.tsx' does not exist.
 File '/src/library-a.d.ts' does not exist.
+File '/src/library-a.ets' does not exist.
+File '/src/library-a.d.ets' does not exist.
 File '/src/library-a.js' does not exist.
 File '/src/library-a.jsx' does not exist.
 File '/src/library-a/package.json' does not exist.
@@ -17,6 +19,8 @@ Loading module as file / folder, candidate module location '/src/library-b', tar
 File '/src/library-b.ts' does not exist.
 File '/src/library-b.tsx' does not exist.
 File '/src/library-b.d.ts' does not exist.
+File '/src/library-b.ets' does not exist.
+File '/src/library-b.d.ets' does not exist.
 File '/src/library-b.js' does not exist.
 File '/src/library-b.jsx' does not exist.
 File '/src/library-b/package.json' does not exist.
@@ -34,6 +38,8 @@ File '/src/library-b/node_modules/library-a/package.json' does not exist.
 File '/src/library-b/node_modules/library-a.ts' does not exist.
 File '/src/library-b/node_modules/library-a.tsx' does not exist.
 File '/src/library-b/node_modules/library-a.d.ts' does not exist.
+File '/src/library-b/node_modules/library-a.ets' does not exist.
+File '/src/library-b/node_modules/library-a.d.ets' does not exist.
 File '/src/library-b/node_modules/library-a/index.ts' exists - use it as a name resolution result.
 Resolving real path for '/src/library-b/node_modules/library-a/index.ts', result '/src/library-a/index.ts'.
 ======== Module name 'library-a' was successfully resolved to '/src/library-a/index.ts'. ========

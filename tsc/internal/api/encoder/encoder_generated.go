@@ -644,7 +644,7 @@ func getNodeCommonData(node *ast.Node) uint32 {
 		case ast.KindDeferKeyword:
 			phaseModifierIdx = 2
 		}
-		return phaseModifierIdx << 24
+		return uint32(boolToByte(n.IsLazy))<<24 | phaseModifierIdx<<25
 	case ast.KindImportSpecifier:
 		n := node.AsImportSpecifier()
 		return uint32(boolToByte(n.IsTypeOnly)) << 24

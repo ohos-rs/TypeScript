@@ -39,6 +39,7 @@ type compilerHost struct {
 	extendedConfigCache  tsoptions.ExtendedConfigCache
 	trace                func(msg *diagnostics.Message, args ...any)
 	contentMapperProject contentmapper.Project
+	kitImports           KitImportProcessor
 }
 
 func NewCachedFSCompilerHost(
@@ -94,7 +95,9 @@ func (h *compilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *ast.Sourc
 	if !ok {
 		return nil
 	}
-	return parser.ParseSourceFile(opts, text, core.EnsureScriptKindFromFileName(opts.FileName))
+	file := parser.ParseSourceFile(opts, text, core.EnsureScriptKindFromFileName(opts.FileName))
+	h.kitImports.Process(file, h.fs)
+	return file
 }
 
 func (h *compilerHost) GetContentMappedSourceFiles(parseOptions ast.SourceFileParseOptions, mapper *contentmapper.Mapper) (contentmapper.SourceFiles, error) {
@@ -107,6 +110,10 @@ func (h *compilerHost) GetContentMappedSourceFiles(parseOptions ast.SourceFilePa
 	}
 	files, err := contentmapper.TransformAndParse(parseOptions, content, mapper, h.contentMapperProject)
 	if err == nil {
+		h.kitImports.Process(files.Canonical, h.fs)
+		for _, supplemental := range files.Supplemental {
+			h.kitImports.Process(supplemental, h.fs)
+		}
 		err = contentmapper.CheckSupplementalFileNameCollisions(files, h.FS().FileExists)
 	}
 	return files, err

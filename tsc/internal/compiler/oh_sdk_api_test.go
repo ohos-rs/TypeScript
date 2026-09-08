@@ -1,6 +1,7 @@
 package compiler_test
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -351,7 +352,14 @@ func TestOHSDKExternalSyscapClassChecker(t *testing.T) {
 	options.OhSdkClassCheckPlugins = []core.OhSdkClassCheckPlugin{{
 		TagName: "syscap", Path: "/sdk/syscap.js", ClassName: "SyscapChecker",
 	}}
-	options.OhSdkPluginExecutor = syscapSDKPluginExecutor{}
+	options.OhSdkPluginProjectConfig = map[string]any{
+		"customPluginValue":     "preserved",
+		"syscapIntersectionSet": []string{"SystemCapability.Base"},
+		"strictMode": map[string]any{
+			"apiCompatibilityCheck": "warning",
+		},
+	}
+	options.SetOhSdkPluginExecutor(syscapSDKPluginExecutor{})
 	program := newOHSDKProgramWithOptions(fs, []string{"/sdk/@ohos.sample.d.ts", "/project/entry/src/main/ets/entry.ets"}, options)
 	diagnostics := ohSDKDiagnostics(program.GetSemanticDiagnostics(t.Context(), nil))
 	if len(diagnostics) != 1 || !strings.Contains(ohDiagnosticText(diagnostics[0]), "extension device excludes current") {
@@ -424,7 +432,7 @@ func TestOHSDKExternalSinceCompatibilityChecker(t *testing.T) {
 		OSName: "HarmonyOS", Tag: "since", Type: "CompatibilityCheck",
 		Path: "/sdk/since-checker.js", FunctionName: "checkSinceValue",
 	}}
-	options.OhSdkPluginExecutor = harmonySDKPluginExecutor{}
+	options.SetOhSdkPluginExecutor(harmonySDKPluginExecutor{})
 	program := newOHSDKProgramWithOptions(fs, []string{"/sdk/@ohos.sample.d.ts", "/project/entry/src/main/ets/entry.ets"}, options)
 	if diagnostics := ohSDKDiagnostics(program.GetSemanticDiagnostics(t.Context(), nil)); len(diagnostics) != 0 {
 		t.Fatalf("external since-checker diagnostics = %v", diagnosticTexts(diagnostics))
@@ -452,14 +460,41 @@ func TestOHSDKExternalFormatAndDistributionCheckers(t *testing.T) {
 	options.OhAllModulePaths = append(options.OhAllModulePaths, "/sdk/@ohos.annotation.d.ets")
 	options.OhSdkCheckPlugins = []core.OhSdkCheckPlugin{
 		{OSName: "HarmonyOS", Tag: "available", Type: "FormatValidation", Path: "/sdk/format.js", FunctionName: "checkAvailableFormat"},
-		{OSName: "HarmonyOS", Tag: "since", Path: "/sdk/distribution.js", FunctionName: "checkDistribution"},
+		{OSName: "HarmonyOS", Tag: "since", Path: "/sdk/distribution.js", FunctionName: "checkFirstDistribution"},
+		{OSName: "HarmonyOS", Tag: "since", Path: "/sdk/distribution.js", FunctionName: "checkLastDistribution"},
 	}
-	options.OhSdkPluginExecutor = harmonySDKPluginExecutor{}
+	options.SetOhSdkPluginExecutor(harmonySDKPluginExecutor{})
 	program := newOHSDKProgramWithOptions(fs, []string{
 		"/sdk/@ohos.annotation.d.ets", "/sdk/@ohos.deviceInfo.d.ts", "/project/entry/src/main/ets/entry.ets",
 	}, options)
 	if diagnostics := ohSDKDiagnostics(program.GetSemanticDiagnostics(t.Context(), nil)); len(diagnostics) != 0 {
 		t.Fatalf("external format/distribution diagnostics = %v", diagnosticTexts(diagnostics))
+	}
+}
+
+// api_check_utils.ts::isCheckDistributionOSVersion returns the value retained
+// from an earlier callback when loading or invoking a later registration fails.
+func TestOHSDKDistributionRetainsValueBeforeFailure(t *testing.T) {
+	t.Parallel()
+	compatible := float64(17)
+	compile := float64(17)
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/sdk/@ohos.deviceInfo.d.ts":            `declare namespace deviceInfo { function apiAvailable(version: string | number): boolean; }`,
+		"/project/entry/src/main/ets/entry.ets": `deviceInfo.apiAvailable("5.0.5(17)");`,
+	}, true))
+	options := ohSDKJSDocOptions(&compatible, &compile)
+	options.OhRuntimeOS = "HarmonyOS"
+	options.OhDeviceTypes = nil
+	options.OhSdkCheckPlugins = []core.OhSdkCheckPlugin{
+		{OSName: "HarmonyOS", Tag: "since", Path: "/sdk/distribution.js", FunctionName: "checkDistribution"},
+		{OSName: "HarmonyOS", Tag: "since", Path: "/sdk/missing.js", FunctionName: "loadFailure"},
+	}
+	options.SetOhSdkPluginExecutor(distributionFailureSDKPluginExecutor{})
+	program := newOHSDKProgramWithOptions(fs, []string{
+		"/sdk/@ohos.deviceInfo.d.ts", "/project/entry/src/main/ets/entry.ets",
+	}, options)
+	if diagnostics := ohSDKDiagnostics(program.GetSemanticDiagnostics(t.Context(), nil)); len(diagnostics) != 0 {
+		t.Fatalf("retained distribution diagnostics = %v", diagnosticTexts(diagnostics))
 	}
 }
 
@@ -492,7 +527,7 @@ func TestOHSDKApiAvailableGuardUsesPlainRequiredVersion(t *testing.T) {
 		{OSName: "HarmonyOS", Tag: "since", Type: "CompatibilityCheck", Path: "/sdk/since.js", FunctionName: "checkSinceValue"},
 		{OSName: "HarmonyOS", Tag: "since", Path: "/sdk/distribution.js", FunctionName: "checkDistribution"},
 	}
-	options.OhSdkPluginExecutor = apiAvailableGuardSDKPluginExecutor{}
+	options.SetOhSdkPluginExecutor(apiAvailableGuardSDKPluginExecutor{})
 	program := newOHSDKProgramWithOptions(fs, []string{
 		"/sdk/@ohos.annotation.d.ets", "/sdk/@ohos.deviceInfo.d.ts", "/project/library.ets", "/project/entry/src/main/ets/entry.ets",
 	}, options)
@@ -739,14 +774,27 @@ type apiAvailableGuardSDKPluginExecutor struct{}
 
 type syscapSDKPluginExecutor struct{ harmonySDKPluginExecutor }
 
+type distributionFailureSDKPluginExecutor struct{ harmonySDKPluginExecutor }
+
+func (distributionFailureSDKPluginExecutor) CheckDistribution(plugin core.OhSdkCheckPlugin, version string) (core.OhSdkPluginDistributionResult, bool, error) {
+	if plugin.FunctionName == "loadFailure" {
+		return core.OhSdkPluginDistributionResult{}, false, errors.New("module load failed")
+	}
+	return harmonySDKPluginExecutor{}.CheckDistribution(plugin, version)
+}
+
 func (syscapSDKPluginExecutor) PrepareClass(core.OhSdkClassCheckPlugin) (bool, error) {
 	return true, nil
 }
 
 func (syscapSDKPluginExecutor) CheckSyscap(plugin core.OhSdkClassCheckPlugin, request core.OhSdkClassCheckRequest) (core.OhSdkPluginSyscapResult, bool, error) {
+	intersection, _ := request.ProjectConfig["syscapIntersectionSet"].([]string)
+	strictMode, _ := request.ProjectConfig["strictMode"].(map[string]any)
 	validRequest := plugin.ClassName == "SyscapChecker" && request.Node.Text == "current" &&
 		strings.Contains(request.Declaration.Text, "declare function current") &&
-		slices.Contains(request.ProjectConfig.SyscapIntersection, "SystemCapability.Base")
+		slices.Contains(intersection, "SystemCapability.Base") &&
+		request.ProjectConfig["customPluginValue"] == "preserved" &&
+		strictMode["apiCompatibilityCheck"] == "warning"
 	return core.OhSdkPluginSyscapResult{
 		CheckResult: validRequest, CheckMessage: "extension device excludes current",
 	}, true, nil
@@ -804,10 +852,14 @@ func (harmonySDKPluginExecutor) CheckFormat(plugin core.OhSdkCheckPlugin, versio
 }
 
 func (harmonySDKPluginExecutor) CheckDistribution(plugin core.OhSdkCheckPlugin, version string) (core.OhSdkPluginDistributionResult, bool, error) {
-	if plugin.FunctionName != "checkDistribution" {
+	switch plugin.FunctionName {
+	case "checkFirstDistribution":
+		return core.OhSdkPluginDistributionResult{Valid: false, Version: "first"}, true, nil
+	case "checkLastDistribution", "checkDistribution":
+		return core.OhSdkPluginDistributionResult{Valid: version == "5.0.5(17)", Version: "17"}, true, nil
+	default:
 		return core.OhSdkPluginDistributionResult{}, false, nil
 	}
-	return core.OhSdkPluginDistributionResult{Valid: version == "5.0.5(17)", Version: "17"}, true, nil
 }
 
 func (harmonySDKPluginExecutor) MatchBuildVersion(core.OhSdkCheckPlugin, string) (core.OhSdkPluginRegexResult, bool, error) {

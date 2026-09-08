@@ -10,6 +10,8 @@ File name '/node_modules/exports-and-types-versions/dist/foo.js' has a '.js' ext
 File '/node_modules/exports-and-types-versions/dist/foo.ts' does not exist.
 File '/node_modules/exports-and-types-versions/dist/foo.tsx' does not exist.
 File '/node_modules/exports-and-types-versions/dist/foo.d.ts' does not exist.
+File '/node_modules/exports-and-types-versions/dist/foo.ets' does not exist.
+File '/node_modules/exports-and-types-versions/dist/foo.d.ets' does not exist.
 Export specifier './foo' does not exist in package.json scope at path '/node_modules/exports-and-types-versions'.
 Directory '/node_modules/@types' does not exist, skipping all lookups in it.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript.
@@ -110,6 +112,8 @@ File name '/node_modules/exports-and-types-versions/dist/foo.js' has a '.js' ext
 File '/node_modules/exports-and-types-versions/dist/foo.ts' does not exist according to earlier cached lookups.
 File '/node_modules/exports-and-types-versions/dist/foo.tsx' does not exist according to earlier cached lookups.
 File '/node_modules/exports-and-types-versions/dist/foo.d.ts' does not exist according to earlier cached lookups.
+File '/node_modules/exports-and-types-versions/dist/foo.ets' does not exist according to earlier cached lookups.
+File '/node_modules/exports-and-types-versions/dist/foo.d.ets' does not exist according to earlier cached lookups.
 Export specifier './foo' does not exist in package.json scope at path '/node_modules/exports-and-types-versions'.
 Directory '/node_modules/@types' does not exist, skipping all lookups in it.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript.

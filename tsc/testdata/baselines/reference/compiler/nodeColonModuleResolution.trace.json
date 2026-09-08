@@ -14,7 +14,10 @@ Directory '/a/b/node_modules/@types/node_modules' does not exist, skipping all l
 File '/a/b/node_modules/ph.ts' does not exist.
 File '/a/b/node_modules/ph.tsx' does not exist.
 File '/a/b/node_modules/ph.d.ts' does not exist.
+File '/a/b/node_modules/ph.ets' does not exist.
+File '/a/b/node_modules/ph.d.ets' does not exist.
 File '/a/b/node_modules/@types/ph.d.ts' does not exist.
+File '/a/b/node_modules/@types/ph.d.ets' does not exist.
 Directory '/a/node_modules' does not exist, skipping all lookups in it.
 Directory '/node_modules' does not exist, skipping all lookups in it.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript, JSON.

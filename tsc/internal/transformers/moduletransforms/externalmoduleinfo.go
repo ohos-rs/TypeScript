@@ -304,7 +304,7 @@ func createExternalHelpersImportDeclarationIfNeeded(emitContext *printer.EmitCon
 
 				externalHelpersImportDeclaration := emitContext.Factory.NewImportDeclaration(
 					nil, /*modifiers*/
-					emitContext.Factory.NewImportClause(ast.KindUnknown /*phaseModifier*/, nil /*name*/, namedBindings),
+					emitContext.Factory.NewImportClause(ast.KindUnknown /*phaseModifier*/, false /*isLazy*/, nil /*name*/, namedBindings),
 					emitContext.Factory.NewStringLiteral(externalHelpersModuleNameText, ast.TokenFlagsNone),
 					nil, /*attributes*/
 				)

@@ -179,6 +179,16 @@ Sendable switches, mix-compile behavior, and diagnostic filtering. The complete
 OpenHarmony `tests/arkTSTest/testcase` expectation corpus is compared by exact
 message and source position in `TestArkTSLinterOpenHarmonyCorpus`.
 
+`disableStrictCheckPaths` follows
+`ArkTSLinter_1_1/Utils.ts::configureStrictCheckOHModule` literally: an absent
+array selects `node_modules`, `oh_modules`, `build`, and `.preview`; an explicit
+empty array selects none; empty and duplicate entries are removed; and
+`enableStrictCheckOHModule` removes only the exact `oh_modules` component. Path
+components remain case-sensitive. This policy is shared by library-symbol
+classification and the strict-diagnostic fallback. The declaration and
+`oh_modules` diagnostic filter is activated only by `needDoArkTsLinter`, as in
+`program.ts`; enabling another OH option does not silently hide diagnostics.
+
 The API-only `maxFlowDepth` option follows the OH checker's numeric depth
 comparison and defaults to 2000 for an absent/zero value. The build host owns
 the upstream 2000–65535 range validation; the compiler does not round values.
@@ -187,6 +197,41 @@ DSL activation distinguishes bare Builder/LocalBuilder/Styles decorators from
 calls and qualified names. Extend/AnimatableExtend require a call with an
 identifier component argument; `@Builder()` and bare `@Extend` do not switch
 an ordinary call followed by a block into a component expression.
+
+## Source parity boundary
+
+The ArkTS 1.1 type frontend is audited against OpenHarmony
+`third_party_typescript` commit
+`9cc62fe98f47c0bf113676e3fb33fe932b493052`. For the Arkdown integration the
+source-owned type surface consists of parsing and binding ETS nodes, type and
+flow inference, semantic and linter diagnostics, OH/kit resolution, SDK API
+validation callbacks, and the checker facts consumed by native transforms.
+Those paths are implemented in Go and exercised by focused tests plus the full
+ArkTS 1.1 linter corpus.
+
+The SDK callback bridge preserves the source distinctions between callback
+families: value and format plugin load failures try the next registration;
+distribution callbacks retain the last successful value and stop on a later
+load or invocation failure; build-version-regex failures stop lookup; and
+class plugin load/constructor failures remove that registration. The class
+checker receives the complete caller-provided `projectConfig` object, including
+fields unknown to the compiler API, while its syscap collections are restored
+as JavaScript `Set` objects. The worker loads the OH TypeScript runtime from
+`etsLoaderPath/node_modules/typescript`, matching the SDK layout installed by
+`developtools_ace_ets2bundle/install_arkguard_tsc_declgen.py`.
+
+The following source changes are deliberately not separate TSGO capabilities:
+
+- JavaScript lowering, annotation metadata emission, ArkUI runtime transforms,
+  obfuscation and source-map rewriting are production Rust/OXC responsibilities.
+- `convertTsAstToJsAst` has no production caller in the current OH compiler or
+  ets2bundle source; no unused ESTree compatibility API is reproduced.
+- builder/document-registry cache flags and checker release hooks are lifecycle
+  optimizations. TSGO uses content-keyed snapshots, parse caches and explicit
+  checker ownership instead of copying the JavaScript cache architecture.
+- Standard TypeScript behavior added by the newer TSGO base is not an ArkTS
+  extension gap. Product configuration choosing a language version is likewise
+  a build-host policy, not a missing type-checker capability.
 
 `node tools/scripts/package-arkts.mjs` builds the three existing release targets
 without replacing an older directory. A dirty build has an explicit worktree

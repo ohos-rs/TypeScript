@@ -121,6 +121,8 @@ Loading module as file / folder, candidate module location '/home/src/workspaces
 File '/home/src/workspaces/solution/child/child2.ts' does not exist.
 File '/home/src/workspaces/solution/child/child2.tsx' does not exist.
 File '/home/src/workspaces/solution/child/child2.d.ts' does not exist.
+File '/home/src/workspaces/solution/child/child2.ets' does not exist.
+File '/home/src/workspaces/solution/child/child2.d.ets' does not exist.
 File '/home/src/workspaces/solution/child/child2.js' does not exist.
 File '/home/src/workspaces/solution/child/child2.jsx' does not exist.
 Directory '/home/src/workspaces/solution/child/child2' does not exist, skipping all lookups in it.

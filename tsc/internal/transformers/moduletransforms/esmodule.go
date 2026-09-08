@@ -217,6 +217,7 @@ func (tx *ESModuleTransformer) visitExportDeclaration(node *ast.ExportDeclaratio
 		nil, /*modifiers*/
 		tx.Factory().NewImportClause(
 			ast.KindUnknown, /*phaseModifier*/
+			false,           /*isLazy*/
 			nil,             /*name*/
 			tx.Factory().NewNamespaceImport(synthName),
 		),
@@ -312,6 +313,7 @@ func (tx *ESModuleTransformer) createRequireCall(node *ast.Node /*ImportDeclarat
 			nil, /*modifiers*/
 			tx.Factory().NewImportClause(
 				ast.KindUnknown, /*phaseModifier*/
+				false,           /*isLazy*/
 				nil,             /*name*/
 				tx.Factory().NewNamedImports(
 					tx.Factory().NewNodeList([]*ast.Node{

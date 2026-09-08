@@ -21,6 +21,17 @@ func collectExternalModuleReferences(file *ast.SourceFile) {
 	}
 }
 
+// RecollectExternalModuleReferences rebuilds the source-file import inventory
+// after OH parser.ts::processKit replaces @kit declarations with virtual
+// imports. The upstream parser performs processKit before this same collection.
+func RecollectExternalModuleReferences(file *ast.SourceFile) {
+	ast.SetImportsOfSourceFile(file, nil)
+	file.ModuleAugmentations = nil
+	file.AmbientModuleNames = nil
+	file.UsesUriStyleNodeCoreModules = core.TSUnknown
+	collectExternalModuleReferences(file)
+}
+
 func collectModuleReferences(file *ast.SourceFile, node *ast.Statement, inAmbientModule bool) {
 	if ast.IsAnyImportOrReExport(node) {
 		moduleNameExpr := ast.GetExternalModuleName(node)

@@ -8,6 +8,8 @@ Found 'package.json' at '/node_modules/foo/package.json'.
 File '/node_modules/foo.ts' does not exist.
 File '/node_modules/foo.tsx' does not exist.
 File '/node_modules/foo.d.ts' does not exist.
+File '/node_modules/foo.ets' does not exist.
+File '/node_modules/foo.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
@@ -16,12 +18,18 @@ Loading module as file / folder, candidate module location '/node_modules/foo/oo
 File '/node_modules/foo/oof.ts' does not exist.
 File '/node_modules/foo/oof.tsx' does not exist.
 File '/node_modules/foo/oof.d.ts' does not exist.
+File '/node_modules/foo/oof.ets' does not exist.
+File '/node_modules/foo/oof.d.ets' does not exist.
 File '/node_modules/foo/oof/index.ts' does not exist.
 File '/node_modules/foo/oof/index.tsx' does not exist.
 File '/node_modules/foo/oof/index.d.ts' does not exist.
+File '/node_modules/foo/oof/index.ets' does not exist.
+File '/node_modules/foo/oof/index.d.ets' does not exist.
 File '/node_modules/foo/index.ts' does not exist.
 File '/node_modules/foo/index.tsx' does not exist.
 File '/node_modules/foo/index.d.ts' does not exist.
+File '/node_modules/foo/index.ets' does not exist.
+File '/node_modules/foo/index.d.ets' does not exist.
 Directory '/node_modules/@types' does not exist, skipping all lookups in it.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript, JSON.
 File '/node_modules/foo/package.json' exists according to earlier cached lookups.

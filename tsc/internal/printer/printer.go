@@ -3953,6 +3953,9 @@ func (p *Printer) emitImportClause(node *ast.ImportClause) {
 	if node.PhaseModifier != ast.KindUnknown {
 		p.emitToken(node.PhaseModifier, node.Pos(), WriteKindKeyword, node.AsNode())
 		p.writeSpace()
+	} else if node.IsLazy {
+		p.emitToken(ast.KindLazyKeyword, node.Pos(), WriteKindKeyword, node.AsNode())
+		p.writeSpace()
 	}
 	if name := node.Name(); name != nil {
 		p.emitBindingIdentifier(node.Name().AsIdentifier())

@@ -74,6 +74,8 @@ Found 'package.json' at '/user/username/projects/myproject/node_modules/pkg2/pac
 File '/user/username/projects/myproject/node_modules/pkg2.ts' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2.tsx' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2.d.ts' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2.ets' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
@@ -320,6 +322,8 @@ Found 'package.json' at '/user/username/projects/myproject/node_modules/pkg2/pac
 File '/user/username/projects/myproject/node_modules/pkg2.ts' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2.tsx' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2.d.ts' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2.ets' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
@@ -423,6 +427,8 @@ Found 'package.json' at '/user/username/projects/myproject/node_modules/pkg2/pac
 File '/user/username/projects/myproject/node_modules/pkg2.ts' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2.tsx' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2.d.ts' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2.ets' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.

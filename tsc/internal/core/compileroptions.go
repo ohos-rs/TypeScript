@@ -22,14 +22,15 @@ type CompilerOptions struct {
 	ModuleRootPath string   `json:"moduleRootPath,omitzero"`
 	MaxFlowDepth   float64  `json:"maxFlowDepth,omitzero"`
 	// OH exposes this option in commandLineParser.ts as well as the host API.
-	EtsAnnotationsEnable   Tristate   `json:"etsAnnotationsEnable,omitzero"`
-	Ets                    EtsOptions `json:"ets,omitzero"`
-	CompileSdkVersion      *float64   `json:"compileSdkVersion,omitzero"`
-	EtsLoaderPath          string     `json:"etsLoaderPath,omitzero"`
-	TsImportSoCheck        Tristate   `json:"tsImportSoCheck,omitzero"`
-	NeedDoArkTsLinter      Tristate   `json:"needDoArkTsLinter,omitzero"`
-	IsCompatibleVersion    Tristate   `json:"isCompatibleVersion,omitzero"`
-	TsImportSendableEnable Tristate   `json:"tsImportSendableEnable,omitzero"`
+	EtsAnnotationsEnable     Tristate   `json:"etsAnnotationsEnable,omitzero"`
+	Ets                      EtsOptions `json:"ets,omitzero"`
+	CompileSdkVersion        *float64   `json:"compileSdkVersion,omitzero"`
+	EtsLoaderPath            string     `json:"etsLoaderPath,omitzero"`
+	NoTransformedKitInParser Tristate   `json:"noTransformedKitInParser,omitzero"`
+	TsImportSoCheck          Tristate   `json:"tsImportSoCheck,omitzero"`
+	NeedDoArkTsLinter        Tristate   `json:"needDoArkTsLinter,omitzero"`
+	IsCompatibleVersion      Tristate   `json:"isCompatibleVersion,omitzero"`
+	TsImportSendableEnable   Tristate   `json:"tsImportSendableEnable,omitzero"`
 	// OH ets_checker.ts::setCompilerOptions and moduleNameResolver.ts. These
 	// values affect the checked source graph and must participate in compiler
 	// option identity rather than being reconstructed by an external caller.
@@ -80,7 +81,11 @@ type CompilerOptions struct {
 	OhApiCompatibilityCheck      string                  `json:"ohApiCompatibilityCheck,omitzero"`
 	OhSdkCheckPlugins            []OhSdkCheckPlugin      `json:"ohSdkCheckPlugins,omitzero"`
 	OhSdkClassCheckPlugins       []OhSdkClassCheckPlugin `json:"ohSdkClassCheckPlugins,omitzero"`
-	OhSdkPluginExecutor          OhSdkPluginExecutor     `json:"-"`
+	// collectExternalApiChecker passes the complete projectConfig object to SDK
+	// class plugins. Preserve caller-owned JSON fields instead of narrowing an
+	// SDK-defined JavaScript ABI to the fields used by the built-in checker.
+	OhSdkPluginProjectConfig map[string]any `json:"ohSdkPluginProjectConfig,omitzero"`
+	ohSdkPluginExecutor      OhSdkPluginExecutor
 
 	AllowJs                                   Tristate                                  `json:"allowJs,omitzero"`
 	AllowArbitraryExtensions                  Tristate                                  `json:"allowArbitraryExtensions,omitzero"`
@@ -223,6 +228,19 @@ type CompilerOptions struct {
 	SingleThreaded Tristate `json:"singleThreaded,omitzero" internal:"true"`
 	Quiet          Tristate `json:"quiet,omitzero" internal:"true"`
 	Checkers       *int     `json:"checkers,omitzero" internal:"true"`
+}
+
+// SetOhSdkPluginExecutor installs the build-host callback bridge used by the
+// OpenHarmony SDK check plugins. It is session state, not a compiler option:
+// developtools_ace_ets2bundle/compiler/src/ets_checker.ts installs these
+// callbacks on the compiler host instead of serializing them in tsconfig.
+func (o *CompilerOptions) SetOhSdkPluginExecutor(executor OhSdkPluginExecutor) {
+	o.ohSdkPluginExecutor = executor
+}
+
+// GetOhSdkPluginExecutor returns the build-host SDK callback bridge.
+func (o *CompilerOptions) GetOhSdkPluginExecutor() OhSdkPluginExecutor {
+	return o.ohSdkPluginExecutor
 }
 
 type OhSdkConfig struct {

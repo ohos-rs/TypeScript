@@ -96,6 +96,8 @@ Found 'package.json' at '/user/username/projects/myproject/plugin-one/node_modul
 File '/user/username/projects/myproject/plugin-one/node_modules/typescript-fsa.ts' does not exist.
 File '/user/username/projects/myproject/plugin-one/node_modules/typescript-fsa.tsx' does not exist.
 File '/user/username/projects/myproject/plugin-one/node_modules/typescript-fsa.d.ts' does not exist.
+File '/user/username/projects/myproject/plugin-one/node_modules/typescript-fsa.ets' does not exist.
+File '/user/username/projects/myproject/plugin-one/node_modules/typescript-fsa.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
@@ -121,6 +123,8 @@ File '/user/username/projects/myproject/plugin-one/node_modules/plugin-two/packa
 File '/user/username/projects/myproject/plugin-one/node_modules/plugin-two.ts' does not exist.
 File '/user/username/projects/myproject/plugin-one/node_modules/plugin-two.tsx' does not exist.
 File '/user/username/projects/myproject/plugin-one/node_modules/plugin-two.d.ts' does not exist.
+File '/user/username/projects/myproject/plugin-one/node_modules/plugin-two.ets' does not exist.
+File '/user/username/projects/myproject/plugin-one/node_modules/plugin-two.d.ets' does not exist.
 File '/user/username/projects/myproject/plugin-one/node_modules/plugin-two/index.ts' does not exist.
 File '/user/username/projects/myproject/plugin-one/node_modules/plugin-two/index.tsx' does not exist.
 File '/user/username/projects/myproject/plugin-one/node_modules/plugin-two/index.d.ts' exists - use it as a name resolution result.
@@ -141,6 +145,8 @@ Found 'package.json' at '/user/username/projects/myproject/plugin-two/node_modul
 File '/user/username/projects/myproject/plugin-two/node_modules/typescript-fsa.ts' does not exist.
 File '/user/username/projects/myproject/plugin-two/node_modules/typescript-fsa.tsx' does not exist.
 File '/user/username/projects/myproject/plugin-two/node_modules/typescript-fsa.d.ts' does not exist.
+File '/user/username/projects/myproject/plugin-two/node_modules/typescript-fsa.ets' does not exist.
+File '/user/username/projects/myproject/plugin-two/node_modules/typescript-fsa.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.

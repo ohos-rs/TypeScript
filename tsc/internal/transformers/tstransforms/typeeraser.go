@@ -320,7 +320,7 @@ func (tx *TypeEraserTransformer) visit(node *ast.Node) *ast.Node {
 			// all import bindings were elided
 			return nil
 		}
-		return tx.Factory().UpdateImportClause(n, n.PhaseModifier, name, namedBindings)
+		return tx.Factory().UpdateImportClause(n, n.PhaseModifier, n.IsLazy, name, namedBindings)
 
 	case ast.KindNamedImports:
 		n := node.AsNamedImports()

@@ -73,6 +73,8 @@ Loading module as file / folder, candidate module location '/project/d', target 
 File '/project/d.ts' does not exist.
 File '/project/d.tsx' does not exist.
 File '/project/d.d.ts' does not exist.
+File '/project/d.ets' does not exist.
+File '/project/d.d.ets' does not exist.
 File '/project/d.js' does not exist.
 File '/project/d.jsx' does not exist.
 File '/project/d/package.json' does not exist.

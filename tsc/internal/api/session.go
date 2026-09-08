@@ -1333,7 +1333,7 @@ func (s *Session) handleCreateProgram(ctx context.Context, params *CreateProgram
 	for i, rootFile := range params.RootFiles {
 		rootFileNames[i] = rootFile.ToAbsoluteFileName(s.currentDirectory())
 	}
-	params.CreateProgramOptions.CompilerOptions.OhSdkPluginExecutor = s.ohSdkPluginExecutor
+	params.CreateProgramOptions.CompilerOptions.SetOhSdkPluginExecutor(s.ohSdkPluginExecutor)
 	if s.ohSdkPluginExecutor != nil {
 		plugins := params.CreateProgramOptions.CompilerOptions.OhSdkClassCheckPlugins
 		loaded := make([]core.OhSdkClassCheckPlugin, 0, len(plugins))

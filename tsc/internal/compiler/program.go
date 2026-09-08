@@ -1618,7 +1618,10 @@ func (p *Program) getBindAndCheckDiagnosticsWithChecker(ctx context.Context, fil
 
 func (p *Program) filterOHCheckDiagnostics(sourceFile *ast.SourceFile, allDiagnostics []*ast.Diagnostic) []*ast.Diagnostic {
 	options := p.Options()
-	if !options.UsesOHModuleResolution() {
+	// program.ts::getBindAndCheckDiagnosticsForFileNoCache enables this filter
+	// only for the ets-loader ArkTS-linter invocation. Other OH compiler options
+	// do not suppress declaration or oh_modules diagnostics by themselves.
+	if options.NeedDoArkTsLinter != core.TSTrue {
 		return allDiagnostics
 	}
 	normalizedFileName := tspath.NormalizePath(sourceFile.FileName())

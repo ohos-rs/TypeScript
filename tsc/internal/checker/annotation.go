@@ -147,9 +147,13 @@ func (c *Checker) checkAnnotationUse(node, declaration *ast.Node) {
 	expression := node.Expression()
 	// OH resolveAnnotation checks the reference for bare and zero-argument
 	// annotations too. Merely resolving its symbol misses temporal dead zones.
-	if !ast.IsCallExpression(expression) {
+	// Its getAnnotationDeclaration/getTypeOfSymbolAtLocation path has already
+	// resolved a declaration's self-annotation, so the three OH annotation
+	// corpus cases `@A @interface A {}` report placement TS28026 only.
+	selfAnnotation := node.Parent == declaration
+	if !selfAnnotation && !ast.IsCallExpression(expression) {
 		c.checkExpression(expression)
-	} else if len(expression.Arguments()) == 0 {
+	} else if !selfAnnotation && len(expression.Arguments()) == 0 {
 		c.checkExpression(expression.Expression())
 	}
 	var argument *ast.Node

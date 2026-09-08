@@ -152,6 +152,8 @@ Found 'package.json' at '/user/username/projects/myproject/node_modules/pkg2/pac
 File '/user/username/projects/myproject/node_modules/pkg2.ts' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2.tsx' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2.d.ts' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2.ets' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' has 'types' field 'index.d.ts' that references '/user/username/projects/myproject/node_modules/pkg2/index.d.ts'.
@@ -229,9 +231,13 @@ File '/user/username/projects/myproject/node_modules/pkg2/package.json' does not
 File '/user/username/projects/myproject/node_modules/pkg2.ts' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2.tsx' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2.d.ts' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2.ets' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2.d.ets' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2/index.ts' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2/index.tsx' does not exist.
 File '/user/username/projects/myproject/node_modules/pkg2/index.d.ts' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2/index.ets' does not exist.
+File '/user/username/projects/myproject/node_modules/pkg2/index.d.ets' does not exist.
 Directory '/user/username/projects/myproject/node_modules/@types' does not exist, skipping all lookups in it.
 Directory '/user/username/projects/node_modules' does not exist, skipping all lookups in it.
 Directory '/user/username/node_modules' does not exist, skipping all lookups in it.

@@ -106,12 +106,13 @@ readline.createInterface({ input: process.stdin, crlfDelay: Infinity }).on('line
       if (!node || !declaration) {
         throw new Error('Unable to recreate SDK checker source nodes');
       }
-      const projectConfig = {
-        ...payload.projectConfig,
-        syscapIntersectionSet: new Set(payload.projectConfig.syscapIntersection),
-        syscapUnionSet: new Set(payload.projectConfig.syscapUnion),
-        strictMode: { apiCompatibilityCheck: payload.projectConfig.apiCompatibilityCheck }
-      };
+      const projectConfig = { ...payload.projectConfig };
+      projectConfig.syscapIntersectionSet = new Set(
+        projectConfig.syscapIntersectionSet || projectConfig.syscapIntersection || []
+      );
+      projectConfig.syscapUnionSet = new Set(
+        projectConfig.syscapUnionSet || projectConfig.syscapUnion || []
+      );
       const value = checker.check(node, declaration, projectConfig);
       send({ id: request.id, found: true, checkResult: Boolean(value && value.checkResult),
         checkMessage: value && value.checkMessage == null ? '' : String(value.checkMessage) });
@@ -255,14 +256,17 @@ func (e *nodeOhSdkPluginExecutor) call(plugin core.OhSdkCheckPlugin, operation s
 	if response.ID != request.ID {
 		return ohSdkPluginResponse{}, false, fmt.Errorf("SDK plugin response id %d does not match request %d", response.ID, request.ID)
 	}
-	if response.Error != "" && response.Found {
-		return ohSdkPluginResponse{}, true, fmt.Errorf("SDK plugin %s#%s %s failed: %s", plugin.Path, plugin.FunctionName, response.Phase, response.Error)
+	if response.Error != "" {
+		return response, response.Found, fmt.Errorf("SDK plugin %s#%s %s failed: %s", plugin.Path, plugin.FunctionName, response.Phase, response.Error)
 	}
 	return response, response.Found, nil
 }
 
 func (e *nodeOhSdkPluginExecutor) CheckValue(plugin core.OhSdkCheckPlugin, required string, target string, scene int) (core.OhSdkPluginCheckResult, bool, error) {
 	response, found, err := e.call(plugin, "value", []any{required, target, scene})
+	if err != nil && response.Phase == "load" {
+		return core.OhSdkPluginCheckResult{}, false, nil
+	}
 	return core.OhSdkPluginCheckResult{Result: response.Result, Message: response.Message}, found, err
 }
 
@@ -270,11 +274,17 @@ func (e *nodeOhSdkPluginExecutor) PrepareClass(plugin core.OhSdkClassCheckPlugin
 	_, found, err := e.call(core.OhSdkCheckPlugin{
 		Path: plugin.Path, FunctionName: plugin.ClassName,
 	}, "prepareClass", nil)
+	if err != nil && !found {
+		return false, nil
+	}
 	return found, err
 }
 
 func (e *nodeOhSdkPluginExecutor) CheckFormat(plugin core.OhSdkCheckPlugin, version string) (core.OhSdkPluginCheckResult, bool, error) {
 	response, found, err := e.call(plugin, "format", []any{version})
+	if err != nil && response.Phase == "load" {
+		return core.OhSdkPluginCheckResult{}, false, nil
+	}
 	return core.OhSdkPluginCheckResult{Result: response.Result, Message: response.Message}, found, err
 }
 
@@ -292,6 +302,9 @@ func (e *nodeOhSdkPluginExecutor) CheckSyscap(plugin core.OhSdkClassCheckPlugin,
 	response, found, err := e.call(core.OhSdkCheckPlugin{
 		Path: plugin.Path, FunctionName: plugin.ClassName,
 	}, "syscap", []any{request})
+	if err != nil && response.Phase == "load" {
+		return core.OhSdkPluginSyscapResult{}, false, nil
+	}
 	return core.OhSdkPluginSyscapResult{
 		CheckResult:  response.CheckResult,
 		CheckMessage: response.CheckMessage,

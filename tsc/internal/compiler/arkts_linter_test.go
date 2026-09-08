@@ -65,6 +65,40 @@ func TestArkTSStrictCheckerOnlyOwnsETSSemanticDiagnostics(t *testing.T) {
 	}
 }
 
+// program.ts applies its declaration/oh_modules diagnostic filter only when
+// needDoArkTsLinter is enabled. An unrelated OH option must not silently hide
+// ordinary declaration diagnostics.
+func TestArkTSLinterDiagnosticFilterActivation(t *testing.T) {
+	t.Parallel()
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/types.d.ts": "declare const invalid: MissingType;\n",
+	}, true))
+	newProgram := func(linter core.Tristate) *compiler.Program {
+		options := &core.CompilerOptions{
+			NoEmit:               core.TSTrue,
+			EtsAnnotationsEnable: core.TSTrue,
+			NeedDoArkTsLinter:    linter,
+			SkipLibCheck:         core.TSFalse,
+			Module:               core.ModuleKindESNext,
+			ModuleResolution:     core.ModuleResolutionKindBundler,
+		}
+		return compiler.NewProgram(compiler.ProgramOptions{
+			Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+				FileNames: []string{"/types.d.ts"}, CompilerOptions: options,
+			}},
+			Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+		})
+	}
+	withoutLinter := newProgram(core.TSFalse).GetSemanticDiagnostics(t.Context(), nil)
+	if !slices.ContainsFunc(withoutLinter, func(diagnostic *ast.Diagnostic) bool { return diagnostic.Code() == 2304 }) {
+		t.Fatalf("ordinary OH diagnostics were filtered without the linter: %v", withoutLinter)
+	}
+	withLinter := newProgram(core.TSTrue).GetSemanticDiagnostics(t.Context(), nil)
+	if slices.ContainsFunc(withLinter, func(diagnostic *ast.Diagnostic) bool { return diagnostic.Code() == 2304 }) {
+		t.Fatalf("declaration diagnostics were not filtered for the linter: %v", withLinter)
+	}
+}
+
 // InteropTypescriptLinter.ts is a separate source-owned ruleset for TS files.
 // LinterRunner.ts enables it only for tsImportSendableEnable (or SDK sources)
 // and does not publish strict-checker diagnostics for those files.

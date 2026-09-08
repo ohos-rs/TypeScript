@@ -895,6 +895,7 @@ func (tx *DeclarationTransformer) transformCjsRequireVariableDeclaration(input *
 			nil,
 			tx.Factory().NewImportClause(
 				ast.KindUnknown,
+				false,
 				nil,
 				tx.Factory().NewNamedImports(tx.Factory().NewNodeList(importSpecifiers)),
 			),
@@ -2533,6 +2534,7 @@ func (tx *DeclarationTransformer) transformImportDeclaration(decl *ast.ImportDec
 			tx.Factory().UpdateImportClause(
 				decl.ImportClause.AsImportClause(),
 				phaseModifier,
+				decl.ImportClause.AsImportClause().IsLazy,
 				visibleDefaultBinding,
 				/*namedBindings*/ nil,
 			),
@@ -2555,6 +2557,7 @@ func (tx *DeclarationTransformer) transformImportDeclaration(decl *ast.ImportDec
 			tx.Factory().UpdateImportClause(
 				decl.ImportClause.AsImportClause(),
 				phaseModifier,
+				decl.ImportClause.AsImportClause().IsLazy,
 				visibleDefaultBinding,
 				namedBindings,
 			),
@@ -2583,6 +2586,7 @@ func (tx *DeclarationTransformer) transformImportDeclaration(decl *ast.ImportDec
 			tx.Factory().UpdateImportClause(
 				decl.ImportClause.AsImportClause(),
 				phaseModifier,
+				decl.ImportClause.AsImportClause().IsLazy,
 				visibleDefaultBinding,
 				namedImports,
 			),

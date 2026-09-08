@@ -33,6 +33,7 @@ export var NodeFlags: any;
     NodeFlags[NodeFlags["ReparserTransformedLiteral"] = 268435456] = "ReparserTransformedLiteral";
     NodeFlags[NodeFlags["Struct"] = 536870912] = "Struct";
     NodeFlags[NodeFlags["EtsComponent"] = 1073741824] = "EtsComponent";
+    NodeFlags[NodeFlags["KitImport"] = -2147483648] = "KitImport";
     NodeFlags[NodeFlags["BlockScoped"] = 7] = "BlockScoped";
     NodeFlags[NodeFlags["Constant"] = 6] = "Constant";
     NodeFlags[NodeFlags["AwaitUsing"] = 6] = "AwaitUsing";

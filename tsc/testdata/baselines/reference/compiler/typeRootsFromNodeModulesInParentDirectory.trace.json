@@ -9,7 +9,10 @@ Directory '/src/node_modules' does not exist, skipping all lookups in it.
 File '/node_modules/xyz.ts' does not exist.
 File '/node_modules/xyz.tsx' does not exist.
 File '/node_modules/xyz.d.ts' does not exist.
+File '/node_modules/xyz.ets' does not exist.
+File '/node_modules/xyz.d.ets' does not exist.
 File '/node_modules/@types/xyz.d.ts' does not exist.
+File '/node_modules/@types/xyz.d.ets' does not exist.
 Searching all ancestor node_modules directories for fallback extensions: JavaScript, JSON.
 Directory '/src/node_modules' does not exist, skipping all lookups in it.
 File '/node_modules/xyz.js' does not exist.

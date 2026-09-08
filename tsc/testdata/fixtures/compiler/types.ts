@@ -214,6 +214,7 @@ export const enum SyntaxKind {
     StringKeyword,
     SymbolKeyword,
     TypeKeyword,
+    LazyKeyword,
     UndefinedKeyword,
     UniqueKeyword,
     UnknownKeyword,
@@ -3722,6 +3723,8 @@ export interface ImportClause extends NamedDeclaration {
     /** @deprecated Use `phaseModifier` instead */
     readonly isTypeOnly: boolean;
     readonly phaseModifier: undefined | ImportPhaseModifierSyntaxKind;
+    /** OpenHarmony `import lazy` modifier. */
+    readonly isLazy: boolean;
     readonly name?: Identifier; // Default binding
     readonly namedBindings?: NamedImportBindings;
 }

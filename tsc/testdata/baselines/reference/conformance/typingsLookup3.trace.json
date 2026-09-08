@@ -3,7 +3,9 @@ Resolving with primary search path '/node_modules/@types'.
 Looking up in 'node_modules' folder, initial location '/'.
 Searching all ancestor node_modules directories for preferred extensions: Declaration.
 File '/node_modules/JqUeRy.d.ts' does not exist.
+File '/node_modules/JqUeRy.d.ets' does not exist.
 File '/node_modules/@types/JqUeRy.d.ts' does not exist.
+File '/node_modules/@types/JqUeRy.d.ets' does not exist.
 ======== Type reference directive 'JqUeRy' was not resolved. ========
 ======== Resolving type reference directive 'jquery', containing file '/__inferred type names__.ts', root directory '/node_modules/@types'. ========
 Resolving with primary search path '/node_modules/@types'.

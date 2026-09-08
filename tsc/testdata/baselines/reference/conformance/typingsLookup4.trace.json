@@ -7,8 +7,11 @@ Searching all ancestor node_modules directories for preferred extensions: TypeSc
 File '/node_modules/jquery.ts' does not exist.
 File '/node_modules/jquery.tsx' does not exist.
 File '/node_modules/jquery.d.ts' does not exist.
+File '/node_modules/jquery.ets' does not exist.
+File '/node_modules/jquery.d.ets' does not exist.
 Found 'package.json' at '/node_modules/@types/jquery/package.json'.
 File '/node_modules/@types/jquery.d.ts' does not exist.
+File '/node_modules/@types/jquery.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' has 'typings' field 'jquery.d.ts' that references '/node_modules/@types/jquery/jquery.d.ts'.
 File '/node_modules/@types/jquery/jquery.d.ts' exists - use it as a name resolution result.
@@ -23,8 +26,11 @@ Searching all ancestor node_modules directories for preferred extensions: TypeSc
 File '/node_modules/kquery.ts' does not exist.
 File '/node_modules/kquery.tsx' does not exist.
 File '/node_modules/kquery.d.ts' does not exist.
+File '/node_modules/kquery.ets' does not exist.
+File '/node_modules/kquery.d.ets' does not exist.
 Found 'package.json' at '/node_modules/@types/kquery/package.json'.
 File '/node_modules/@types/kquery.d.ts' does not exist.
+File '/node_modules/@types/kquery.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' has 'typings' field 'kquery' that references '/node_modules/@types/kquery/kquery'.
 Loading module as file / folder, candidate module location '/node_modules/@types/kquery/kquery', target file types: TypeScript, Declaration.
@@ -42,8 +48,11 @@ Searching all ancestor node_modules directories for preferred extensions: TypeSc
 File '/node_modules/lquery.ts' does not exist.
 File '/node_modules/lquery.tsx' does not exist.
 File '/node_modules/lquery.d.ts' does not exist.
+File '/node_modules/lquery.ets' does not exist.
+File '/node_modules/lquery.d.ets' does not exist.
 Found 'package.json' at '/node_modules/@types/lquery/package.json'.
 File '/node_modules/@types/lquery.d.ts' does not exist.
+File '/node_modules/@types/lquery.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' has 'typings' field 'lquery' that references '/node_modules/@types/lquery/lquery'.
 Loading module as file / folder, candidate module location '/node_modules/@types/lquery/lquery', target file types: TypeScript, Declaration.
@@ -59,14 +68,19 @@ Searching all ancestor node_modules directories for preferred extensions: TypeSc
 File '/node_modules/mquery.ts' does not exist.
 File '/node_modules/mquery.tsx' does not exist.
 File '/node_modules/mquery.d.ts' does not exist.
+File '/node_modules/mquery.ets' does not exist.
+File '/node_modules/mquery.d.ets' does not exist.
 Found 'package.json' at '/node_modules/@types/mquery/package.json'.
 File '/node_modules/@types/mquery.d.ts' does not exist.
+File '/node_modules/@types/mquery.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' has 'typings' field 'mquery' that references '/node_modules/@types/mquery/mquery'.
 Loading module as file / folder, candidate module location '/node_modules/@types/mquery/mquery', target file types: TypeScript, Declaration.
 File '/node_modules/@types/mquery/mquery.ts' does not exist.
 File '/node_modules/@types/mquery/mquery.tsx' does not exist.
 File '/node_modules/@types/mquery/mquery.d.ts' does not exist.
+File '/node_modules/@types/mquery/mquery.ets' does not exist.
+File '/node_modules/@types/mquery/mquery.d.ets' does not exist.
 File '/node_modules/@types/mquery/mquery/index.ts' does not exist.
 File '/node_modules/@types/mquery/mquery/index.tsx' exists - use it as a name resolution result.
 Resolving real path for '/node_modules/@types/mquery/mquery/index.tsx', result '/node_modules/@types/mquery/mquery/index.tsx'.

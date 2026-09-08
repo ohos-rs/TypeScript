@@ -13,6 +13,9 @@ type SourceFileParseOptions struct {
 	// including the project parse cache and incremental source-file reuse.
 	EtsAnnotationsEnable bool
 	Ets                  core.EtsOptions
+	// OH parser.ts::processKit is part of the parsed type-program identity.
+	EtsLoaderPath            string
+	NoTransformedKitInParser bool
 }
 
 type ExternalModuleIndicatorOptions struct {

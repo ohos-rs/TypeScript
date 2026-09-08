@@ -1,6 +1,7 @@
 ======== Resolving type reference directive 'alpha', containing file '/test/foo.ts', root directory '/test/types'. ========
 Resolving with primary search path '/test/types'.
 File '/test/types/alpha.d.ts' does not exist.
+File '/test/types/alpha.d.ets' does not exist.
 File '/test/types/alpha/package.json' does not exist.
 File '/test/types/alpha/index.d.ts' exists - use it as a name resolution result.
 Resolving real path for '/test/types/alpha/index.d.ts', result '/test/types/alpha/index.d.ts'.
@@ -8,6 +9,7 @@ Resolving real path for '/test/types/alpha/index.d.ts', result '/test/types/alph
 ======== Resolving type reference directive 'beta', containing file '/test/foo.ts', root directory '/test/types'. ========
 Resolving with primary search path '/test/types'.
 File '/test/types/beta.d.ts' does not exist.
+File '/test/types/beta.d.ets' does not exist.
 File '/test/types/beta/package.json' does not exist.
 File '/test/types/beta/index.d.ts' exists - use it as a name resolution result.
 Resolving real path for '/test/types/beta/index.d.ts', result '/test/types/beta/index.d.ts'.
@@ -15,6 +17,7 @@ Resolving real path for '/test/types/beta/index.d.ts', result '/test/types/beta/
 ======== Resolving type reference directive 'beta', containing file '/test/types/alpha/index.d.ts', root directory '/test/types'. ========
 Resolving with primary search path '/test/types'.
 File '/test/types/beta.d.ts' does not exist according to earlier cached lookups.
+File '/test/types/beta.d.ets' does not exist according to earlier cached lookups.
 File '/test/types/beta/package.json' does not exist according to earlier cached lookups.
 File '/test/types/beta/index.d.ts' exists - use it as a name resolution result.
 Resolving real path for '/test/types/beta/index.d.ts', result '/test/types/beta/index.d.ts'.
@@ -22,6 +25,7 @@ Resolving real path for '/test/types/beta/index.d.ts', result '/test/types/beta/
 ======== Resolving type reference directive 'alpha', containing file '/test/types/beta/index.d.ts', root directory '/test/types'. ========
 Resolving with primary search path '/test/types'.
 File '/test/types/alpha.d.ts' does not exist according to earlier cached lookups.
+File '/test/types/alpha.d.ets' does not exist according to earlier cached lookups.
 File '/test/types/alpha/package.json' does not exist according to earlier cached lookups.
 File '/test/types/alpha/index.d.ts' exists - use it as a name resolution result.
 Resolving real path for '/test/types/alpha/index.d.ts', result '/test/types/alpha/index.d.ts'.

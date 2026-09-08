@@ -9,6 +9,8 @@ Found 'package.json' at '/.src/node_modules/ext/package.json'.
 File '/.src/node_modules/ext.ts' does not exist.
 File '/.src/node_modules/ext.tsx' does not exist.
 File '/.src/node_modules/ext.d.ts' does not exist.
+File '/.src/node_modules/ext.ets' does not exist.
+File '/.src/node_modules/ext.d.ets' does not exist.
 'package.json' has a 'typesVersions' field with version-specific path mappings.
 'package.json' does not have a 'typings' field.
 'package.json' has 'types' field 'index' that references '/.src/node_modules/ext/index'.

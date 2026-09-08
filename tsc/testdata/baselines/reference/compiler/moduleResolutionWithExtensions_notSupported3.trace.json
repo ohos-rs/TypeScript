@@ -5,6 +5,8 @@ Loading module as file / folder, candidate module location '/jsx', target file t
 File '/jsx.ts' does not exist.
 File '/jsx.tsx' does not exist.
 File '/jsx.d.ts' does not exist.
+File '/jsx.ets' does not exist.
+File '/jsx.d.ets' does not exist.
 File '/jsx.js' does not exist.
 File '/jsx.jsx' exists - use it as a name resolution result.
 ======== Module name './jsx' was successfully resolved to '/jsx.jsx'. ========

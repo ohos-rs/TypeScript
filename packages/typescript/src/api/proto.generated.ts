@@ -1299,6 +1299,7 @@ export interface CompilerOptions {
     ets?: EtsOptions;
     compileSdkVersion?: number;
     etsLoaderPath?: string;
+    noTransformedKitInParser?: boolean;
     tsImportSoCheck?: boolean;
     needDoArkTsLinter?: boolean;
     isCompatibleVersion?: boolean;
@@ -1357,6 +1358,14 @@ export interface CompilerOptions {
     ohCompileMode?: string;
     ohBundleType?: string;
     ohApiCompatibilityCheck?: string;
+    ohSdkCheckPlugins?: OhSdkCheckPlugin[];
+    ohSdkClassCheckPlugins?: OhSdkClassCheckPlugin[];
+    /**
+     * collectExternalApiChecker passes the complete projectConfig object to SDK
+     * class plugins. Preserve caller-owned JSON fields instead of narrowing an
+     * SDK-defined JavaScript ABI to the fields used by the built-in checker.
+     */
+    ohSdkPluginProjectConfig?: Record<string, unknown>;
     allowJs?: boolean;
     allowArbitraryExtensions?: boolean;
     allowImportingTsExtensions?: boolean;
@@ -1600,6 +1609,30 @@ export interface EtsOptions {
 
 export interface OhSdkConfig {
     apiPaths?: string[];
+}
+
+/**
+ * OhSdkCheckPlugin is one function-style checker registered by
+ * ets2bundle/compiler/main.js::collectExternalApiCheckPlugin. Paths are
+ * resolved by the build service before the compiler Program is created.
+ */
+export interface OhSdkCheckPlugin {
+    osName: string;
+    tag: string;
+    type?: string;
+    path: string;
+    functionName: string;
+}
+
+/**
+ * OhSdkClassCheckPlugin is one class-style checker registered by
+ * compiler/main.js::collectExternalApiChecker. The current source invokes this
+ * ABI only for the syscap JSDoc callback.
+ */
+export interface OhSdkClassCheckPlugin {
+    tagName: string;
+    path: string;
+    className: string;
 }
 
 /**

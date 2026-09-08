@@ -1411,7 +1411,7 @@ func (f *isolatedDeclarationsFixer) addSymbolToExistingImport(sym *ast.Symbol) {
 			newSpecifier := factory.NewImportSpecifier(false, nil, factory.NewIdentifier(symbolName))
 			newElements := append(existingElements, newSpecifier.AsNode())
 			newNamedImports := factory.NewNamedImports(factory.NewNodeList(newElements))
-			newImportClause := factory.UpdateImportClause(importClause, importClause.PhaseModifier, importClause.Name(), newNamedImports)
+			newImportClause := factory.UpdateImportClause(importClause, importClause.PhaseModifier, importClause.IsLazy, importClause.Name(), newNamedImports)
 			newImportDecl := factory.UpdateImportDeclaration(importDecl, importDecl.Modifiers(), newImportClause, importDecl.ModuleSpecifier, importDecl.Attributes)
 			f.changeTracker.ReplaceNode(f.sourceFile, stmt, newImportDecl.AsNode(), nil)
 		}

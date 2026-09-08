@@ -413,6 +413,8 @@ func (p *fileLoader) parseSourceFile(t *parseTask) *ast.SourceFile {
 		ExternalModuleIndicatorOptions: ast.GetExternalModuleIndicatorOptions(t.normalizedFilePath, options, t.metadata),
 		EtsAnnotationsEnable:           options.EtsAnnotationsEnable == core.TSTrue,
 		Ets:                            options.Ets,
+		EtsLoaderPath:                  options.EtsLoaderPath,
+		NoTransformedKitInParser:       options.NoTransformedKitInParser == core.TSTrue,
 	}
 	if tspath.FileExtensionIsOneOf(t.normalizedFilePath, p.contentMapperExtensions) {
 		return p.parseContentMappedFile(parseOptions)

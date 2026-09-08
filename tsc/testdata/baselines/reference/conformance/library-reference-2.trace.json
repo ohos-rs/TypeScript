@@ -1,6 +1,7 @@
 ======== Resolving type reference directive 'jquery', containing file '/consumer.ts', root directory '/types'. ========
 Resolving with primary search path '/types'.
 File '/types/jquery.d.ts' does not exist.
+File '/types/jquery.d.ets' does not exist.
 Found 'package.json' at '/types/jquery/package.json'.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.

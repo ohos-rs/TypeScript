@@ -8,6 +8,8 @@ Found 'package.json' at '/node_modules/lodash/package.json'.
 File '/node_modules/lodash.ts' does not exist.
 File '/node_modules/lodash.tsx' does not exist.
 File '/node_modules/lodash.d.ts' does not exist.
+File '/node_modules/lodash.ets' does not exist.
+File '/node_modules/lodash.d.ets' does not exist.
 'package.json' does not have a 'typesVersions' field.
 'package.json' does not have a 'typings' field.
 'package.json' does not have a 'types' field.
