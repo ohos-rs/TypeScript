@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/internal/bundled"
 	"github.com/microsoft/TypeScript/tsc/internal/contentmapper"
+	"github.com/microsoft/TypeScript/tsc/internal/core"
 	"github.com/microsoft/TypeScript/tsc/internal/ipc"
 	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/internal/project"
@@ -102,7 +103,7 @@ func (s *StdioServer) Run(ctx context.Context) error {
 	if s.options.OhSdkPluginCallbacks && !s.options.Async {
 		return fmt.Errorf("OH SDK plugin callbacks require the asynchronous API protocol")
 	}
-	var sdkPluginExecutor *clientOhSdkPluginExecutor
+	var sdkPluginExecutor core.OhSdkPluginExecutor
 	if s.options.OhSdkPluginCallbacks {
 		sdkPluginExecutor = newClientOhSdkPluginExecutor()
 	}
@@ -136,8 +137,8 @@ func (s *StdioServer) Run(ctx context.Context) error {
 	if callbackFS != nil {
 		callbackFS.SetConnection(ctx, conn)
 	}
-	if sdkPluginExecutor != nil {
-		sdkPluginExecutor.SetConnection(ctx, conn)
+	if executor, ok := sdkPluginExecutor.(*clientOhSdkPluginExecutor); ok {
+		executor.SetConnection(ctx, conn)
 	}
 
 	return conn.Run(ctx)
