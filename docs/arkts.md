@@ -155,6 +155,14 @@ or JSDoc resolution outside TypeScript. Its type-kind fields are semantic
 booleans rather than the compiler's internal `TypeFlags` numbers: the current
 TSGO and OH TypeScript layouts are different, so exposing raw bits would make a
 native consumer silently apply the wrong ArkTS rule.
+For `@ObjectLink`, the property identity includes nullable/basic,
+`@ObservedV2`, `Function`, and union-constituent facts so the Rust transform can
+apply `checkObjectLinkType` without recreating TypeScript inference.
+
+OH mode also preserves 4.9 enum flow semantics: a computed numeric member makes
+the enum a regular numeric enum unless a string literal member selected the
+literal enum path first. Ordinary TypeScript programs retain the current TSGO
+member-literal union behavior.
 
 OH `checker.ts::resolveExternalModule/allowImportSendable` import checks are
 implemented for `.so` (warning 28014) and TS-to-ETS imports (28016/28017).
