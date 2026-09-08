@@ -78,19 +78,42 @@ func TestClientOhSdkPluginExecutorPreservesTypedCallbackContracts(t *testing.T) 
 	if found, err := executor.PrepareClass(classPlugin); err != nil || !found {
 		t.Fatalf("prepare class found %v, error %v", found, err)
 	}
-	syscap, found, err := executor.CheckSyscap(classPlugin, core.OhSdkClassCheckRequest{})
+	classRequest := core.OhSdkClassCheckRequest{
+		Node: core.OhSdkPluginNodeSnapshot{
+			FileName: "/project/Index.ets", Source: "use API", Pos: 0, End: 3, Text: "use",
+		},
+		Declaration: core.OhSdkPluginNodeSnapshot{
+			FileName: "/sdk/api.d.ets", Source: "declare API", Pos: 8, End: 11, Text: "API",
+		},
+		ProjectConfig: map[string]any{"etsLoaderPath": "/sdk/loader"},
+	}
+	syscap, found, err := executor.CheckSyscap(classPlugin, classRequest)
 	if err != nil || !found || !syscap.CheckResult || syscap.CheckMessage != "syscap" {
 		t.Fatalf("syscap result = %#v, found %v, error %v", syscap, found, err)
 	}
-
-	if len(conn.requests) != 6 {
-		t.Fatalf("received %d callbacks, want 6", len(conn.requests))
+	if _, _, err := executor.CheckSyscap(classPlugin, classRequest); err != nil {
+		t.Fatalf("second syscap callback failed: %v", err)
 	}
-	if conn.requests[0].Path != plugin.Path || conn.requests[0].Operation != "value" {
+
+	if len(conn.requests) != 7 {
+		t.Fatalf("received %d callbacks, want 7", len(conn.requests))
+	}
+	if conn.requests[0].SessionID == 0 || conn.requests[0].Path != plugin.Path || conn.requests[0].Operation != "value" {
 		t.Fatalf("first callback = %#v", conn.requests[0])
 	}
 	if conn.requests[4].ClassName != classPlugin.ClassName {
 		t.Fatalf("class callback = %#v", conn.requests[4])
+	}
+	first, ok := conn.requests[5].Args[0].(clientOhSdkClassCheckRequest)
+	if !ok || first.Node.Source == nil || first.Declaration.Source == nil || first.ProjectConfig == nil {
+		t.Fatalf("first syscap callback did not register session data: %#v", conn.requests[5].Args)
+	}
+	second, ok := conn.requests[6].Args[0].(clientOhSdkClassCheckRequest)
+	if !ok || second.Node.Source != nil || second.Declaration.Source != nil || second.ProjectConfig != nil {
+		t.Fatalf("second syscap callback repeated session data: %#v", conn.requests[6].Args)
+	}
+	if first.Node.SourceID != second.Node.SourceID || first.ProjectConfigID != second.ProjectConfigID {
+		t.Fatalf("syscap session ids changed: first %#v, second %#v", first, second)
 	}
 }
 
