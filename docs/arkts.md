@@ -155,7 +155,8 @@ or JSDoc resolution outside TypeScript. Its type-kind fields are semantic
 booleans rather than the compiler's internal `TypeFlags` numbers: the current
 TSGO and OH TypeScript layouts are different, so exposing raw bits would make a
 native consumer silently apply the wrong ArkTS rule.
-For `@ObjectLink`, the property identity includes nullable/basic,
+For `@ObjectLink`, the property identity distinguishes unions from intersections
+and includes nullable/basic,
 `@ObservedV2`, `Function`, and union-constituent facts so the Rust transform can
 apply `checkObjectLinkType` without recreating TypeScript inference.
 

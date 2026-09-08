@@ -45,6 +45,7 @@ type ArkTSExpressionTypeFactsResponse struct {
 // remains valid after the Program snapshot is released.
 type ResolvedTypeIdentityResponse struct {
 	IsNullable   bool                            `json:"isNullable"`
+	IsUnion      bool                            `json:"isUnion"`
 	IsEnum       bool                            `json:"isEnum"`
 	IsBasic      bool                            `json:"isBasic"`
 	IsObservedV2 bool                            `json:"isObservedV2"`
@@ -64,6 +65,7 @@ func newResolvedTypeIdentityResponse(typ *checker.Type) *ResolvedTypeIdentityRes
 		checker.TypeFlagsEnumLiteral | checker.TypeFlagsBigIntLiteral
 	response := &ResolvedTypeIdentityResponse{
 		IsNullable: flags&checker.TypeFlagsNullable != 0,
+		IsUnion:    flags&checker.TypeFlagsUnion != 0,
 		IsEnum:     flags&checker.TypeFlagsEnumLike != 0,
 		IsBasic:    flags&basic != 0,
 	}
