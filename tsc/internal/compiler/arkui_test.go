@@ -121,8 +121,10 @@ func TestArkUIUsesOpenHarmony49ExpressionDiagnostics(t *testing.T) {
 	const source = `
 		declare class Box<T> { value: T; }
 		declare const maybeBox: unknown;
+		declare const arkLength: string | number;
 		if ({}) {}
 		if (null) {}
+		if (arkLength > 0) {}
 		maybeBox instanceof Box<number>;
 	`
 	check := func(loaderPath string) []int32 {
@@ -148,13 +150,13 @@ func TestArkUIUsesOpenHarmony49ExpressionDiagnostics(t *testing.T) {
 	}
 
 	ordinary := check("")
-	for _, code := range []int32{2848, 2872, 2873} {
+	for _, code := range []int32{2365, 2848, 2872, 2873} {
 		if !slices.Contains(ordinary, code) {
 			t.Fatalf("ordinary TypeScript lost TS%d: %v", code, ordinary)
 		}
 	}
 	openHarmony := check("/loader")
-	for _, code := range []int32{2848, 2872, 2873} {
+	for _, code := range []int32{2365, 2848, 2872, 2873} {
 		if slices.Contains(openHarmony, code) {
 			t.Fatalf("OpenHarmony 4.9 mode must not report TS%d: %v", code, openHarmony)
 		}

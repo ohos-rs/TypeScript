@@ -12912,16 +12912,28 @@ func (c *Checker) checkBinaryLikeExpression(left *ast.Node, operatorToken *ast.N
 		return resultType
 	case ast.KindLessThanToken, ast.KindGreaterThanToken, ast.KindLessThanEqualsToken, ast.KindGreaterThanEqualsToken:
 		if c.checkForDisallowedESSymbolOperand(left, right, leftType, rightType, operator) {
-			leftType = c.getBaseTypeOfLiteralTypeForComparison(c.checkNonNullType(leftType, left))
-			rightType = c.getBaseTypeOfLiteralTypeForComparison(c.checkNonNullType(rightType, right))
-			c.reportOperatorErrorUnless(leftType, operator, rightType, errorNode, func(left *Type, right *Type) bool {
-				if IsTypeAny(left) || IsTypeAny(right) {
-					return true
-				}
-				leftAssignableToNumber := c.isTypeAssignableTo(left, c.numberOrBigIntType)
-				rightAssignableToNumber := c.isTypeAssignableTo(right, c.numberOrBigIntType)
-				return leftAssignableToNumber && rightAssignableToNumber || !leftAssignableToNumber && !rightAssignableToNumber && c.areTypesComparable(left, right)
-			})
+			if c.compilerOptions.EtsLoaderPath != "" {
+				// OpenHarmony third_party_typescript 4.9 uses the ordinary
+				// literal base and accepts comparable relational operands before
+				// considering numeric assignability.
+				leftType = c.getBaseTypeOfLiteralType(c.checkNonNullType(leftType, left))
+				rightType = c.getBaseTypeOfLiteralType(c.checkNonNullType(rightType, right))
+				c.reportOperatorErrorUnless(leftType, operator, rightType, errorNode, func(left *Type, right *Type) bool {
+					return c.areTypesComparable(left, right) ||
+						c.isTypeAssignableTo(left, c.numberOrBigIntType) && c.isTypeAssignableTo(right, c.numberOrBigIntType)
+				})
+			} else {
+				leftType = c.getBaseTypeOfLiteralTypeForComparison(c.checkNonNullType(leftType, left))
+				rightType = c.getBaseTypeOfLiteralTypeForComparison(c.checkNonNullType(rightType, right))
+				c.reportOperatorErrorUnless(leftType, operator, rightType, errorNode, func(left *Type, right *Type) bool {
+					if IsTypeAny(left) || IsTypeAny(right) {
+						return true
+					}
+					leftAssignableToNumber := c.isTypeAssignableTo(left, c.numberOrBigIntType)
+					rightAssignableToNumber := c.isTypeAssignableTo(right, c.numberOrBigIntType)
+					return leftAssignableToNumber && rightAssignableToNumber || !leftAssignableToNumber && !rightAssignableToNumber && c.areTypesComparable(left, right)
+				})
+			}
 		}
 		return c.booleanType
 	case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken, ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
