@@ -223,18 +223,17 @@ func TestArkTSLinterOpenHarmonyCorpus(t *testing.T) {
 	for _, expectationFile := range expectationFiles {
 		expectationFile := expectationFile
 		relative, _ := filepath.Rel(testcaseRoot, expectationFile)
+		sourceFile := strings.TrimSuffix(expectationFile, ".json") + ".ets"
+		if _, err := os.Stat(sourceFile); err != nil {
+			sourceFile = strings.TrimSuffix(expectationFile, ".json") + ".ts"
+		}
+		if _, err := os.Stat(sourceFile); err != nil {
+			// The OH runner traverses only .ets/.ts sources. JSON data files and
+			// expectations paired with .js are therefore not corpus cases.
+			continue
+		}
 		t.Run(relative, func(t *testing.T) {
 			expected := readArkTS11Expectation(t, expectationFile)
-			if expected == nil {
-				t.Skip("not an ArkTS linter expectation")
-			}
-			sourceFile := strings.TrimSuffix(expectationFile, ".json") + ".ets"
-			if _, err := os.Stat(sourceFile); err != nil {
-				sourceFile = strings.TrimSuffix(expectationFile, ".json") + ".ts"
-			}
-			if _, err := os.Stat(sourceFile); err != nil {
-				t.Skip("expectation has no matching .ets or .ts source")
-			}
 
 			files := []string{sourceFile}
 			entries, err := os.ReadDir(filepath.Dir(sourceFile))
@@ -270,10 +269,6 @@ func TestArkTSLinterOpenHarmonyCorpus(t *testing.T) {
 	}
 }
 
-type arkTSLinterExpectationFile struct {
-	ArkTS11 []arkTSLinterExpectation `json:"arktsVersion_1_1"`
-}
-
 type arkTSLinterExpectation struct {
 	MessageText string              `json:"messageText"`
 	Position    arkTSLinterPosition `json:"expectLineAndCharacter"`
@@ -290,11 +285,29 @@ func readArkTS11Expectation(t *testing.T, fileName string) []arkTSLinterExpectat
 	if err != nil {
 		t.Fatal(err)
 	}
-	var result arkTSLinterExpectationFile
-	if err := json.Unmarshal(content, &result); err != nil {
-		return nil
+	var value any
+	if err := json.Unmarshal(content, &value); err != nil {
+		t.Fatal(err)
 	}
-	return result.ArkTS11
+	object, ok := value.(map[string]any)
+	if !ok {
+		// OH run.js reads `expect.arktsVersion_1_1`; arrays and other valid
+		// JSON values therefore select its empty-expectation fallback.
+		return []arkTSLinterExpectation{}
+	}
+	arkts11, ok := object["arktsVersion_1_1"]
+	if !ok {
+		return []arkTSLinterExpectation{}
+	}
+	encoded, err := json.Marshal(arkts11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result []arkTSLinterExpectation
+	if err := json.Unmarshal(encoded, &result); err != nil {
+		t.Fatal(err)
+	}
+	return result
 }
 
 func newArkTSLinterProgram(fs vfs.FS, currentDirectory string, files []string) *compiler.Program {
