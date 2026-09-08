@@ -415,7 +415,14 @@ func (w *filesParser) getProcessedFiles(loader *fileLoader) processedFiles {
 						})
 					}
 				}
-				if !loader.opts.Config.CompilerOptions().ForceConsistentCasingInFileNames.IsFalse() {
+				options := loader.opts.Config.CompilerOptions()
+				// OH program.ts checks casing on a case-insensitive host only when
+				// forceConsistentCasingInFileNames is explicitly truthy. TypeScript
+				// 7 defaults an unset option to enabled, so retain that default only
+				// outside an ETS-loader program.
+				checkFileCasing := options.ForceConsistentCasingInFileNames.IsTrue() ||
+					options.EtsLoaderPath == "" && !options.ForceConsistentCasingInFileNames.IsFalse()
+				if checkFileCasing {
 					// Check if it differs only in drive letters its ok to ignore that error:
 					checkedAbsolutePath := tspath.GetNormalizedAbsolutePathWithoutRoot(checkedName, loader.comparePathsOptions.CurrentDirectory)
 					inputAbsolutePath := tspath.GetNormalizedAbsolutePathWithoutRoot(task.normalizedFilePath, loader.comparePathsOptions.CurrentDirectory)

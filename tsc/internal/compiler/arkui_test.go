@@ -199,6 +199,43 @@ func TestArkUIUsesOpenHarmony49LegacyEscapeScanning(t *testing.T) {
 	}
 }
 
+func TestArkUIUsesOpenHarmony49FileCasingDefault(t *testing.T) {
+	t.Parallel()
+
+	check := func(loaderPath string) []int32 {
+		fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+			"/entry.ts": `import "./Index"; import "./index";`,
+			"/index.ts": `export const value = 1;`,
+		}, false))
+		program := compiler.NewProgram(compiler.ProgramOptions{
+			Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+				FileNames: []string{"/entry.ts"},
+				CompilerOptions: &core.CompilerOptions{
+					NoEmit:           core.TSTrue,
+					Module:           core.ModuleKindESNext,
+					ModuleResolution: core.ModuleResolutionKindBundler,
+					EtsLoaderPath:    loaderPath,
+				},
+			}},
+			Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+		})
+		var codes []int32
+		for _, diagnostic := range program.GetSemanticDiagnostics(t.Context(), nil) {
+			codes = append(codes, diagnostic.Code())
+		}
+		return codes
+	}
+
+	ordinary := check("")
+	if !slices.Contains(ordinary, int32(1149)) && !slices.Contains(ordinary, int32(1261)) {
+		t.Fatalf("ordinary TypeScript lost its default casing diagnostic: %v", ordinary)
+	}
+	openHarmony := check("/loader")
+	if slices.Contains(openHarmony, int32(1149)) || slices.Contains(openHarmony, int32(1261)) {
+		t.Fatalf("OpenHarmony 4.9 mode enabled casing checks by default: %v", openHarmony)
+	}
+}
+
 func TestArkUISourceOwnedDiagnostics(t *testing.T) {
 	t.Parallel()
 
