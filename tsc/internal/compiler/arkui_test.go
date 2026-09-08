@@ -199,6 +199,55 @@ func TestArkUIUsesOpenHarmony49LegacyEscapeScanning(t *testing.T) {
 	}
 }
 
+func TestArkUIUsesOpenHarmony49ComputedNumericEnumFlow(t *testing.T) {
+	t.Parallel()
+
+	const source = `
+		enum ShareChannel {
+			NONE = 0,
+			WEIXIN = 1 << 0,
+			POSTER = 1 << 13,
+		}
+		function select(channel: string): void {
+			let shareType = ShareChannel.NONE;
+			switch (channel) {
+				case "weixin":
+					shareType = ShareChannel.WEIXIN;
+					break;
+				default:
+					return;
+			}
+			if (shareType === ShareChannel.POSTER) {}
+		}
+	`
+	check := func(loaderPath string) []int32 {
+		fs := bundled.WrapFS(vfstest.FromMap(map[string]string{"/input.ts": source}, true))
+		program := compiler.NewProgram(compiler.ProgramOptions{
+			Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+				FileNames: []string{"/input.ts"},
+				CompilerOptions: &core.CompilerOptions{
+					NoEmit:        core.TSTrue,
+					Target:        core.ScriptTargetESNext,
+					EtsLoaderPath: loaderPath,
+				},
+			}},
+			Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+		})
+		var codes []int32
+		for _, diagnostic := range program.GetSemanticDiagnostics(t.Context(), nil) {
+			codes = append(codes, diagnostic.Code())
+		}
+		return codes
+	}
+
+	if ordinary := check(""); !slices.Contains(ordinary, 2367) {
+		t.Fatalf("ordinary TypeScript lost the computed-enum narrowing diagnostic: %v", ordinary)
+	}
+	if openHarmony := check("/loader"); slices.Contains(openHarmony, 2367) {
+		t.Fatalf("OpenHarmony 4.9 numeric enum must not narrow to member literals: %v", openHarmony)
+	}
+}
+
 func TestArkUIUsesOpenHarmony49FileCasingDefault(t *testing.T) {
 	t.Parallel()
 

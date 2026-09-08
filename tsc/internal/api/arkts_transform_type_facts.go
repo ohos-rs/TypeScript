@@ -44,11 +44,13 @@ type ArkTSExpressionTypeFactsResponse struct {
 // an API object handle. One batched request therefore has no follow-up IPC and
 // remains valid after the Program snapshot is released.
 type ResolvedTypeIdentityResponse struct {
-	IsNullable bool                            `json:"isNullable"`
-	IsEnum     bool                            `json:"isEnum"`
-	IsBasic    bool                            `json:"isBasic"`
-	SymbolName string                          `json:"symbolName"`
-	Types      []*ResolvedTypeIdentityResponse `json:"types"`
+	IsNullable   bool                            `json:"isNullable"`
+	IsEnum       bool                            `json:"isEnum"`
+	IsBasic      bool                            `json:"isBasic"`
+	IsObservedV2 bool                            `json:"isObservedV2"`
+	IsFunction   bool                            `json:"isFunction"`
+	SymbolName   string                          `json:"symbolName"`
+	Types        []*ResolvedTypeIdentityResponse `json:"types"`
 }
 
 func newResolvedTypeIdentityResponse(typ *checker.Type) *ResolvedTypeIdentityResponse {
@@ -67,6 +69,13 @@ func newResolvedTypeIdentityResponse(typ *checker.Type) *ResolvedTypeIdentityRes
 	}
 	if symbol := typ.Symbol(); symbol != nil {
 		response.SymbolName = symbol.Name
+		response.IsFunction = symbol.Name == "Function"
+		for _, declaration := range symbol.Declarations {
+			if ast.IsClassDeclaration(declaration) && ast.HasArkUIBareDecorator(declaration.Modifiers(), "ObservedV2") {
+				response.IsObservedV2 = true
+				break
+			}
+		}
 	}
 	if flags&checker.TypeFlagsUnionOrIntersection != 0 {
 		for _, constituent := range typ.Types() {

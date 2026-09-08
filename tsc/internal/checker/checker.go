@@ -24596,6 +24596,27 @@ func (c *Checker) getDeclaredTypeOfTypeAlias(symbol *ast.Symbol) *Type {
 func (c *Checker) getDeclaredTypeOfEnum(symbol *ast.Symbol) *Type {
 	links := c.declaredTypeLinks.Get(symbol)
 	if !(links.declaredType != nil) {
+		// OpenHarmony third_party_typescript 4.9 distinguishes literal enums
+		// from numeric enums before creating member literal types. In
+		// particular, a computed numeric member such as `1 << 13` makes the
+		// complete enum numeric (unless a string literal member selected the
+		// literal path first). Newer TypeScript creates a union for computed
+		// members too, which changes control-flow narrowing and can report
+		// comparisons that the SDK checker accepts as TS2367.
+		if c.compilerOptions.EtsLoaderPath != "" && !c.isOpenHarmonyLiteralEnum(symbol) {
+			enumType := c.createComputedEnumType(symbol)
+			for _, declaration := range symbol.Declarations {
+				if declaration.Kind != ast.KindEnumDeclaration {
+					continue
+				}
+				for _, member := range declaration.Members() {
+					memberSymbol := c.getSymbolOfDeclaration(member)
+					c.declaredTypeLinks.Get(memberSymbol).declaredType = enumType
+				}
+			}
+			links.declaredType = enumType
+			return enumType
+		}
 		var memberTypeList []*Type
 		for _, declaration := range symbol.Declarations {
 			if declaration.Kind == ast.KindEnumDeclaration {
@@ -24628,6 +24649,64 @@ func (c *Checker) getDeclaredTypeOfEnum(symbol *ast.Symbol) *Type {
 		links.declaredType = enumType
 	}
 	return links.declaredType
+}
+
+// isOpenHarmonyLiteralEnum is the value-side equivalent of OpenHarmony 4.9
+// checker.ts::{getEnumKind,isLiteralEnumMember}. It intentionally preserves
+// getEnumKind's early string-literal return and does not use evaluated enum
+// values to classify computed numeric initializers.
+func (c *Checker) isOpenHarmonyLiteralEnum(symbol *ast.Symbol) bool {
+	hasNonLiteralMember := false
+	for _, declaration := range symbol.Declarations {
+		if declaration.Kind != ast.KindEnumDeclaration {
+			continue
+		}
+		for _, member := range declaration.Members() {
+			initializer := member.Initializer()
+			if initializer != nil && ast.IsStringLiteralLike(initializer) {
+				return true
+			}
+			if !c.isOpenHarmonyLiteralEnumMember(member) {
+				hasNonLiteralMember = true
+			}
+		}
+	}
+	return !hasNonLiteralMember
+}
+
+func (c *Checker) isOpenHarmonyLiteralEnumMember(member *ast.Node) bool {
+	initializer := member.Initializer()
+	if initializer == nil {
+		return member.Flags&ast.NodeFlagsAmbient == 0
+	}
+	switch initializer.Kind {
+	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindNoSubstitutionTemplateLiteral:
+		return true
+	case ast.KindPrefixUnaryExpression:
+		expression := initializer.AsPrefixUnaryExpression()
+		return expression.Operator == ast.KindMinusToken && expression.Operand.Kind == ast.KindNumericLiteral
+	case ast.KindIdentifier:
+		if ast.NodeIsMissing(initializer) {
+			return true
+		}
+		parentSymbol := c.getSymbolOfDeclaration(member.Parent)
+		return parentSymbol != nil && parentSymbol.Exports != nil && parentSymbol.Exports[initializer.Text()] != nil
+	case ast.KindBinaryExpression:
+		return c.isOpenHarmonyStringConcatExpression(initializer)
+	default:
+		return false
+	}
+}
+
+func (c *Checker) isOpenHarmonyStringConcatExpression(expression *ast.Node) bool {
+	if ast.IsStringLiteralLike(expression) {
+		return true
+	}
+	if !ast.IsBinaryExpression(expression) {
+		return false
+	}
+	binary := expression.AsBinaryExpression()
+	return c.isOpenHarmonyStringConcatExpression(binary.Left) && c.isOpenHarmonyStringConcatExpression(binary.Right)
 }
 
 func (c *Checker) getEnumMemberValue(node *ast.Node) evaluator.Result {
