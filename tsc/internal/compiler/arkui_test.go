@@ -309,6 +309,64 @@ func TestArkUIUsesOpenHarmony49NumericEnumAssignability(t *testing.T) {
 	}
 }
 
+func TestArkUIUsesOpenHarmony49CommonSupertypeInference(t *testing.T) {
+	t.Parallel()
+
+	const source = `
+		interface ContextA { a: number; }
+		interface ContextB { b: number; }
+		interface Extra { enabled: boolean; }
+		abstract class ICanvasDraw<T extends object = object> {
+			abstract methodName: string;
+			abstract onDraw(ctx: ContextA | ContextB, data: T, extra: Extra): Promise<boolean>;
+		}
+		type ArcParams = [number, number, number];
+		type DrawImageParams = [string, number, number] | [string, number, number, number, number];
+		type ClipParams = number[];
+		class Arc extends ICanvasDraw<ArcParams> {
+			methodName = "arc";
+			async onDraw(ctx: ContextA, data: ArcParams, extra: Extra): Promise<boolean> { return true; }
+		}
+		class DrawImage extends ICanvasDraw<DrawImageParams> {
+			methodName = "drawImage";
+			async onDraw(ctx: ContextA, data: DrawImageParams, extra: Extra): Promise<boolean> { return true; }
+		}
+		class Clip extends ICanvasDraw<ClipParams> {
+			methodName = "clip";
+			async onDraw(ctx: ContextB, data: ClipParams, extra: Extra): Promise<boolean> { return true; }
+		}
+		const methods: Map<string, ICanvasDraw<object>> = new Map([
+			["arc", new Arc() as ICanvasDraw<object>],
+			["drawImage", new DrawImage()],
+			["clip", new Clip()],
+		]);
+	`
+	check := func(loaderPath string) []int32 {
+		fs := bundled.WrapFS(vfstest.FromMap(map[string]string{"/input.ts": source}, true))
+		program := compiler.NewProgram(compiler.ProgramOptions{
+			Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+				FileNames: []string{"/input.ts"},
+				CompilerOptions: &core.CompilerOptions{
+					NoEmit:        core.TSTrue,
+					Target:        core.ScriptTargetES2021,
+					EtsLoaderPath: loaderPath,
+				},
+			}},
+			Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+		})
+		return core.Map(program.GetSemanticDiagnostics(t.Context(), nil), func(diagnostic *ast.Diagnostic) int32 {
+			return diagnostic.Code()
+		})
+	}
+
+	if ordinary := check(""); !slices.Contains(ordinary, int32(2769)) {
+		t.Fatalf("ordinary TypeScript lost its newer common-supertype result: %v", ordinary)
+	}
+	if openHarmony := check("/loader"); len(openHarmony) != 0 {
+		t.Fatalf("OH 4.9 common-supertype inference must accept the heterogeneous Map: %v", openHarmony)
+	}
+}
+
 func TestArkUISourceOwnedDiagnostics(t *testing.T) {
 	t.Parallel()
 

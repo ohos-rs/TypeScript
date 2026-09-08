@@ -1317,6 +1317,50 @@ func (c *Checker) inferFromIntraExpressionSites(n *InferenceContext) {
 func (c *Checker) getInferredType(n *InferenceContext, index int) *Type {
 	inference := n.inferences[index]
 	if inference.inferredType == nil {
+		if c.compilerOptions.EtsLoaderPath != "" {
+			// OpenHarmony third_party_typescript 4.9 selects inferred candidates
+			// and applies constraints with this ordering. Newer TypeScript keeps a
+			// fallback candidate and performs additional cross-inference conflict
+			// checks, which changes existing ArkTS generic constructor inference.
+			var inferredType *Type
+			if n.signature != nil {
+				var inferredCovariantType *Type
+				if len(inference.candidates) != 0 {
+					inferredCovariantType = c.getCovariantInference(inference, n.signature)
+				}
+				if len(inference.contraCandidates) != 0 {
+					if inferredCovariantType != nil && inferredCovariantType.flags&TypeFlagsNever == 0 &&
+						core.Some(inference.contraCandidates, func(t *Type) bool {
+							return c.isTypeSubtypeOf(inferredCovariantType, t)
+						}) {
+						inferredType = inferredCovariantType
+					} else {
+						inferredType = c.getContravariantInference(inference)
+					}
+				} else if inferredCovariantType != nil {
+					inferredType = inferredCovariantType
+				} else if n.flags&InferenceFlagsNoDefault != 0 {
+					inferredType = c.silentNeverType
+				} else if defaultType := c.getDefaultFromTypeParameter(inference.typeParameter); defaultType != nil {
+					inferredType = c.instantiateType(defaultType, mergeTypeMappers(c.newBackreferenceMapper(n, index), n.nonFixingMapper))
+				}
+			} else {
+				inferredType = c.getTypeFromInference(inference)
+			}
+			inference.inferredType = inferredType
+			if inference.inferredType == nil {
+				inference.inferredType = core.IfElse(n.flags&InferenceFlagsAnyDefault != 0, c.anyType, c.unknownType)
+			}
+			if constraint := c.getConstraintOfTypeParameter(inference.typeParameter); constraint != nil {
+				instantiatedConstraint := c.instantiateType(constraint, n.nonFixingMapper)
+				if inferredType == nil || n.compareTypes(inferredType, c.getTypeWithThisArgument(instantiatedConstraint, inferredType, false), false) == TernaryFalse {
+					inferredType = instantiatedConstraint
+					inference.inferredType = inferredType
+				}
+			}
+			c.clearActiveMapperCaches()
+			return inference.inferredType
+		}
 		if inference.typeParameter == c.errorType {
 			return inference.typeParameter
 		}
@@ -1544,6 +1588,14 @@ func (c *Checker) getCommonSupertype(types []*Type) *Type {
 	var supertype *Type
 	if c.literalTypesWithSameBaseType(primaryTypes) {
 		supertype = c.getUnionType(primaryTypes)
+	} else if c.compilerOptions.EtsLoaderPath != "" {
+		// OpenHarmony third_party_typescript 4.9 reduces candidates once from
+		// left to right with the ordinary subtype relation. Keep that inference
+		// order for an ETS-loader program; the newer strict-supertype pre-pass
+		// can replace an explicit broad candidate with a later concrete class
+		// (for example a heterogeneous Map whose first tuple is cast to the
+		// declared ESObject-based value type).
+		supertype = c.findLeftmostType(primaryTypes, (*Checker).isTypeSubtypeOf)
 	} else {
 		supertype = c.getSingleCommonSupertype(primaryTypes)
 	}

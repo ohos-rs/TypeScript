@@ -26410,9 +26410,28 @@ func (c *Checker) getUnionTypeWorker(types []*Type, unionReduction UnionReductio
 			typeSet = c.removeConstrainedTypeVariables(typeSet)
 		}
 		if unionReduction == UnionReductionSubtype {
+			if c.compilerOptions.EtsLoaderPath != "" {
+				// OpenHarmony third_party_typescript 4.9 performs subtype
+				// reduction in checker type-allocation order. The Go compiler's
+				// canonical structural sort remains required for union identity,
+				// so use the source ordering only for this observable reduction.
+				slices.SortStableFunc(typeSet, func(left *Type, right *Type) int {
+					switch {
+					case left.id < right.id:
+						return -1
+					case left.id > right.id:
+						return 1
+					default:
+						return 0
+					}
+				})
+			}
 			typeSet = c.removeSubtypes(typeSet, includes&TypeFlagsObject != 0)
 			if typeSet == nil {
 				return c.errorType
+			}
+			if c.compilerOptions.EtsLoaderPath != "" {
+				slices.SortStableFunc(typeSet, CompareTypes)
 			}
 		}
 		if len(typeSet) == 0 {

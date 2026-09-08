@@ -4585,11 +4585,21 @@ func (r *Relater) constructorVisibilitiesAreCompatible(sourceSignature *Signatur
 // See signatureAssignableTo, compareSignaturesIdentical
 func (r *Relater) signatureRelatedTo(source *Signature, target *Signature, erase bool, reportErrors bool, intersectionState IntersectionState) Ternary {
 	checkMode := SignatureCheckModeNone
-	switch {
-	case r.relation == r.c.subtypeRelation:
-		checkMode = SignatureCheckModeStrictTopSignature
-	case r.relation == r.c.strictSubtypeRelation:
-		checkMode = SignatureCheckModeStrictTopSignature | SignatureCheckModeStrictArity
+	if r.c.compilerOptions.EtsLoaderPath != "" {
+		// OpenHarmony third_party_typescript 4.9 applies StrictArity only to
+		// strict-subtype signature comparisons. StrictTopSignature was added by
+		// newer TypeScript and changes subtype reduction/inference for existing
+		// ArkTS generic class hierarchies.
+		if r.relation == r.c.strictSubtypeRelation {
+			checkMode = SignatureCheckModeStrictArity
+		}
+	} else {
+		switch {
+		case r.relation == r.c.subtypeRelation:
+			checkMode = SignatureCheckModeStrictTopSignature
+		case r.relation == r.c.strictSubtypeRelation:
+			checkMode = SignatureCheckModeStrictTopSignature | SignatureCheckModeStrictArity
+		}
 	}
 	if erase {
 		source = r.c.getErasedSignature(source)
