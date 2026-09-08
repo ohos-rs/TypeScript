@@ -42,6 +42,34 @@ func TestOHApiAvailableUsesSDKDeclarationIdentity(t *testing.T) {
 	}
 }
 
+func TestArkTSSemanticsMatchOHNullishCoalescingDiagnostics(t *testing.T) {
+	t.Parallel()
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/input.ets": `const value = (1 + 2) ?? 0;`,
+		"/input.ts":  `const value = (1 + 2) ?? 0;`,
+	}, true))
+	arktsOptions := &core.CompilerOptions{
+		NoEmit:        core.TSTrue,
+		EtsLoaderPath: "/sdk/ets/build-tools/ets-loader",
+		Ets:           etstest.Options(),
+	}
+	arktsProgram := newOHSDKProgramWithOptions(fs, []string{"/input.ets"}, arktsOptions)
+	for _, diagnostic := range arktsProgram.GetSemanticDiagnostics(t.Context(), nil) {
+		if diagnostic.Code() == 2869 || diagnostic.Code() == 2871 {
+			t.Fatalf("OH ArkTS mode reported newer TypeScript nullish diagnostic: %s", ohDiagnosticText(diagnostic))
+		}
+	}
+
+	typescriptProgram := newOHSDKProgramWithOptions(fs, []string{"/input.ts"}, &core.CompilerOptions{NoEmit: core.TSTrue})
+	found := false
+	for _, diagnostic := range typescriptProgram.GetSemanticDiagnostics(t.Context(), nil) {
+		found = found || diagnostic.Code() == 2869
+	}
+	if !found {
+		t.Fatal("ordinary TypeScript mode must retain TS2869")
+	}
+}
+
 // api_check_utils.ts::findNonNullType permits a nullable apiAvailable type
 // when null/undefined removal leaves one constituent, and rejects ambiguous
 // unions with multiple non-null constituents.

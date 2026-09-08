@@ -13379,7 +13379,14 @@ func (c *Checker) checkNullishCoalesceOperands(left *ast.Node, right *ast.Node) 
 			c.grammarErrorOnNode(right, diagnostics.X_0_and_1_operations_cannot_be_mixed_without_parentheses, scanner.TokenToString(ast.KindQuestionQuestionToken), scanner.TokenToString(operatorToken.Kind))
 		}
 	}
-	c.checkNullishCoalesceOperandLeft(left)
+	// OpenHarmony third_party_typescript's checker.ts performs the operator
+	// grammar checks above but does not implement the newer upstream
+	// checkNullishCoalesceOperandLeft semantic diagnostic (TS2869/TS2871).
+	// Preserve current TypeScript behavior for ordinary TS projects while the
+	// ETS loader marker selects the source-compatible ArkTS 1.1 checker mode.
+	if c.compilerOptions.EtsLoaderPath == "" {
+		c.checkNullishCoalesceOperandLeft(left)
+	}
 }
 
 func (c *Checker) checkNullishCoalesceOperandLeft(left *ast.Node) {
