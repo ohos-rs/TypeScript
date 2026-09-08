@@ -154,7 +154,9 @@ func (e *clientOhSdkPluginExecutor) internProjectConfig(config map[string]any) (
 
 func (e *clientOhSdkPluginExecutor) CheckValue(plugin core.OhSdkCheckPlugin, required string, target string, scene int) (core.OhSdkPluginCheckResult, bool, error) {
 	response, found, err := e.call(plugin, "value", []any{required, target, scene})
-	if err != nil && response.Phase == "load" {
+	// api_check_utils.ts::initValueChecker catches both require() and callback
+	// invocation failures, then tries the next configured plugin.
+	if err != nil {
 		return core.OhSdkPluginCheckResult{}, false, nil
 	}
 	return core.OhSdkPluginCheckResult{Result: response.Result, Message: response.Message}, found, err
@@ -172,7 +174,9 @@ func (e *clientOhSdkPluginExecutor) PrepareClass(plugin core.OhSdkClassCheckPlug
 
 func (e *clientOhSdkPluginExecutor) CheckFormat(plugin core.OhSdkCheckPlugin, version string) (core.OhSdkPluginCheckResult, bool, error) {
 	response, found, err := e.call(plugin, "format", []any{version})
-	if err != nil && response.Phase == "load" {
+	// api_check_utils.ts::initFormatChecker has the same catch-and-continue
+	// policy as initValueChecker.
+	if err != nil {
 		return core.OhSdkPluginCheckResult{}, false, nil
 	}
 	return core.OhSdkPluginCheckResult{Result: response.Result, Message: response.Message}, found, err

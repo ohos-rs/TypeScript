@@ -129,10 +129,30 @@ func TestClientOhSdkPluginExecutorPreservesLoadFailurePolicy(t *testing.T) {
 	}
 }
 
+func TestClientOhSdkPluginExecutorPreservesFunctionInvocationFailurePolicy(t *testing.T) {
+	executor := newClientOhSdkPluginExecutor()
+	executor.SetConnection(context.Background(), sdkPluginInvokeErrorConn{})
+	plugin := core.OhSdkCheckPlugin{Path: "/throwing.cjs", FunctionName: "check"}
+	if _, found, err := executor.CheckValue(plugin, "1", "1", 0); err != nil || found {
+		t.Fatalf("value invocation failure found %v, error %v", found, err)
+	}
+	if _, found, err := executor.CheckFormat(plugin, "1"); err != nil || found {
+		t.Fatalf("format invocation failure found %v, error %v", found, err)
+	}
+}
+
 type sdkPluginErrorConn struct{}
 
 func (sdkPluginErrorConn) Run(context.Context) error                 { return nil }
 func (sdkPluginErrorConn) Notify(context.Context, string, any) error { return nil }
 func (sdkPluginErrorConn) Call(context.Context, string, any) (json.Value, error) {
 	return json.Marshal(ohSdkPluginResponse{Phase: "load", Error: "module not found"})
+}
+
+type sdkPluginInvokeErrorConn struct{}
+
+func (sdkPluginInvokeErrorConn) Run(context.Context) error                 { return nil }
+func (sdkPluginInvokeErrorConn) Notify(context.Context, string, any) error { return nil }
+func (sdkPluginInvokeErrorConn) Call(context.Context, string, any) (json.Value, error) {
+	return json.Marshal(ohSdkPluginResponse{Found: true, Phase: "invoke", Error: "callback threw"})
 }
