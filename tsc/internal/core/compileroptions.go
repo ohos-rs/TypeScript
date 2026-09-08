@@ -61,23 +61,26 @@ type CompilerOptions struct {
 	// ets_checker.ts installs SDK validation callbacks closed over these
 	// projectConfig values. The native checker owns the same behavior directly,
 	// so the callback inputs are explicit immutable compiler state.
-	OhRuntimeOS                  string   `json:"ohRuntimeOS,omitzero"`
-	OhOriginCompatibleSdkVersion string   `json:"ohOriginCompatibleSdkVersion,omitzero"`
-	OhProjectRootPath            string   `json:"ohProjectRootPath,omitzero"`
-	OhModulePath                 string   `json:"ohModulePath,omitzero"`
-	OhAllModulePaths             []string `json:"ohAllModulePaths,omitzero"`
-	OhGlobalModulePaths          []string `json:"ohGlobalModulePaths,omitzero"`
-	OhArkUIDeclarationDirs       []string `json:"ohArkUIDeclarationDirs,omitzero"`
-	OhRequestPermissions         []string `json:"ohRequestPermissions,omitzero"`
-	OhSyscapIntersection         []string `json:"ohSyscapIntersection,omitzero"`
-	OhSyscapUnion                []string `json:"ohSyscapUnion,omitzero"`
-	OhDeviceTypes                []string `json:"ohDeviceTypes,omitzero"`
-	OhCardEntryFiles             []string `json:"ohCardEntryFiles,omitzero"`
-	OhCrossplatform              Tristate `json:"ohCrossplatform,omitzero"`
-	OhIgnoreCrossplatformCheck   Tristate `json:"ohIgnoreCrossplatformCheck,omitzero"`
-	OhCompileMode                string   `json:"ohCompileMode,omitzero"`
-	OhBundleType                 string   `json:"ohBundleType,omitzero"`
-	OhApiCompatibilityCheck      string   `json:"ohApiCompatibilityCheck,omitzero"`
+	OhRuntimeOS                  string                  `json:"ohRuntimeOS,omitzero"`
+	OhOriginCompatibleSdkVersion string                  `json:"ohOriginCompatibleSdkVersion,omitzero"`
+	OhProjectRootPath            string                  `json:"ohProjectRootPath,omitzero"`
+	OhModulePath                 string                  `json:"ohModulePath,omitzero"`
+	OhAllModulePaths             []string                `json:"ohAllModulePaths,omitzero"`
+	OhGlobalModulePaths          []string                `json:"ohGlobalModulePaths,omitzero"`
+	OhArkUIDeclarationDirs       []string                `json:"ohArkUIDeclarationDirs,omitzero"`
+	OhRequestPermissions         []string                `json:"ohRequestPermissions,omitzero"`
+	OhSyscapIntersection         []string                `json:"ohSyscapIntersection,omitzero"`
+	OhSyscapUnion                []string                `json:"ohSyscapUnion,omitzero"`
+	OhDeviceTypes                []string                `json:"ohDeviceTypes,omitzero"`
+	OhCardEntryFiles             []string                `json:"ohCardEntryFiles,omitzero"`
+	OhCrossplatform              Tristate                `json:"ohCrossplatform,omitzero"`
+	OhIgnoreCrossplatformCheck   Tristate                `json:"ohIgnoreCrossplatformCheck,omitzero"`
+	OhCompileMode                string                  `json:"ohCompileMode,omitzero"`
+	OhBundleType                 string                  `json:"ohBundleType,omitzero"`
+	OhApiCompatibilityCheck      string                  `json:"ohApiCompatibilityCheck,omitzero"`
+	OhSdkCheckPlugins            []OhSdkCheckPlugin      `json:"ohSdkCheckPlugins,omitzero"`
+	OhSdkClassCheckPlugins       []OhSdkClassCheckPlugin `json:"ohSdkClassCheckPlugins,omitzero"`
+	OhSdkPluginExecutor          OhSdkPluginExecutor     `json:"-"`
 
 	AllowJs                                   Tristate                                  `json:"allowJs,omitzero"`
 	AllowArbitraryExtensions                  Tristate                                  `json:"allowArbitraryExtensions,omitzero"`

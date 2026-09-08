@@ -188,10 +188,12 @@ func (c *Checker) validateOHApiAvailableArgument(argument *ast.Node) ohSDKCheckR
 		return result
 	}
 	if parseDecimal(match[1]) < ohMSFIntegerVersion {
-		// No closed-source DistributionOS version callback is configured in the
-		// native checker, matching ets2bundle's invalid default result.
+		distribution, configured := c.ohSdkCheckDistribution("since", content)
+		if configured && distribution.Valid {
+			return result
+		}
 		result.valid = false
-		result.message = "11706014#"
+		result.message = "11706014#" + distribution.Message
 	}
 	return result
 }
@@ -222,7 +224,8 @@ func parseOHAvailableVersion(raw string) ohParsedVersion {
 	return ohParsedVersion{os: os, version: version, formatVersion: os + " " + version}
 }
 
-func validateOHAvailableVersion(version ohParsedVersion, runtimeOS string) ohSDKCheckResult {
+func (c *Checker) validateOHAvailableVersion(version ohParsedVersion) ohSDKCheckResult {
+	runtimeOS := c.ohRuntimeOS()
 	result := ohSDKCheckResult{valid: true, category: diagnostics.CategoryError}
 	if version.os != ohRuntimeOS && version.os != runtimeOS {
 		result.valid = false
@@ -232,16 +235,35 @@ func validateOHAvailableVersion(version ohParsedVersion, runtimeOS string) ohSDK
 		).Replace(ohAvailableOSNameError)
 		return result
 	}
-	valid := ohAvailableFormatPattern.MatchString(version.version)
-	if valid && strings.Contains(version.version, ".") {
-		valid = parseDecimal(strings.SplitN(version.version, ".", 2)[0]) >= ohMSFIntegerVersion
+	checkedVersion := version.version
+	valid := false
+	pluginMessage := ""
+	if version.os == ohRuntimeOS {
+		valid = ohAvailableFormatPattern.MatchString(checkedVersion)
+		if valid && strings.Contains(checkedVersion, ".") {
+			valid = parseDecimal(strings.SplitN(checkedVersion, ".", 2)[0]) >= ohMSFIntegerVersion
+		}
+	} else {
+		checkedVersion = version.formatVersion
+		if pluginResult, configured := c.ohSdkCheckFormat("available", checkedVersion); configured {
+			valid = pluginResult.Result
+			pluginMessage = pluginResult.Message
+		} else {
+			valid = ohAvailableFormatPattern.MatchString(checkedVersion)
+			if valid && strings.Contains(checkedVersion, ".") {
+				valid = parseDecimal(strings.SplitN(checkedVersion, ".", 2)[0]) >= ohMSFIntegerVersion
+			}
+		}
 	}
 	if valid {
 		return result
 	}
 	result.valid = false
 	prefix := strings.NewReplacer("$RUNTIMEOS", runtimeOS, "$VERSION", version.version).Replace(ohAvailableVersionFormatErrorPrefix)
-	result.message = "11706016#" + prefix + " " + ohAvailableVersionFormatError
+	if pluginMessage == "" {
+		pluginMessage = ohAvailableVersionFormatError
+	}
+	result.message = "11706016#" + prefix + " " + pluginMessage
 	return result
 }
 
@@ -259,11 +281,11 @@ func (c *Checker) checkSourceRetentionAnnotationContent(node *ast.Node, declarat
 			continue
 		}
 		current := parseOHAvailableVersion(property.Initializer().Text())
-		if result := validateOHAvailableVersion(current, c.ohRuntimeOS()); !result.valid {
+		if result := c.validateOHAvailableVersion(current); !result.valid {
 			c.addOHSDKDiagnostic(node, result)
 			return
 		}
-		if outer, ok := c.findOuterOHAvailableVersion(node.Parent); ok && compareOHPointVersions(current.version, outer.version) < 0 {
+		if outer, ok := c.findOuterOHAvailableVersion(node.Parent); ok && !c.ohAvailableVersionsCompatible(outer, current) {
 			c.addOHSDKDiagnostic(node, ohSDKCheckResult{
 				valid:    false,
 				message:  strings.Replace(ohAvailableScopeError, "$VERSION", outer.version, 1),
@@ -272,6 +294,17 @@ func (c *Checker) checkSourceRetentionAnnotationContent(node *ast.Node, declarat
 		}
 		return
 	}
+}
+
+func (c *Checker) ohAvailableVersionsCompatible(required ohParsedVersion, target ohParsedVersion) bool {
+	scene := 2
+	if target.os == ohRuntimeOS {
+		scene = 1
+	}
+	if result, configured := c.ohSdkCheckValue("available", required.formatVersion, target.formatVersion, scene); configured {
+		return result.Result
+	}
+	return compareOHSDKVersions(target.version, required.version) >= 0
 }
 
 func (c *Checker) findOuterOHAvailableVersion(node *ast.Node) (ohParsedVersion, bool) {
@@ -292,7 +325,7 @@ func (c *Checker) findOuterOHAvailableVersion(node *ast.Node) (ohParsedVersion, 
 				initializer := property.Initializer()
 				if ast.IsStringLiteral(initializer) || ast.IsNumericLiteral(initializer) {
 					version := parseOHAvailableVersion(initializer.Text())
-					if validateOHAvailableVersion(version, c.ohRuntimeOS()).valid {
+					if c.validateOHAvailableVersion(version).valid {
 						return version, true
 					}
 				}

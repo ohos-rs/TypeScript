@@ -116,9 +116,15 @@ The SDK `Available`/`SuppressWarnings` declaration identity also selects source
 retention. The native checker implements the source-owned content/version and
 parent-scope checks, `apiAvailable` argument validation, SDK JSDoc checks and
 their `@Available`/`@SuppressWarnings`/guard suppressors. The build host supplies
-the callback closure inputs as immutable compiler options. Runtime annotation
-metadata lowering remains a Rust/OXC consumer responsibility; it is not a
-TypeScript emit feature in the Arkdown integration.
+the callback closure inputs as immutable compiler options. When the SDK declares
+CommonJS `apiCheckPlugin`, `annotationCheckPlugin`, or class-style
+`apiCheckPlugins`, `--runExternalCode` enables a session-owned Node worker that
+preserves the source `require()` ABI, callback order, class construction timing,
+SDK TypeScript AST nodes, regular expressions, and module/instance cache. Node
+hosts only those SDK JavaScript functions; parsing, binding, type inference,
+diagnostics, callback selection, and fallback rules remain in Go. Runtime
+annotation metadata lowering remains a Rust/OXC consumer responsibility; it is
+not a TypeScript emit feature in the Arkdown integration.
 
 The native checker now implements OH's `@throws` call checks (warning 28040),
 including function/method boundaries, try/catch and chained catch handling,

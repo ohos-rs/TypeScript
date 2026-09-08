@@ -37,6 +37,7 @@ type StdioServerOptions struct {
 	CollectTiming bool
 	// RunExternalCode allows configured content mappers to execute.
 	RunExternalCode      bool
+	NodeExecutable       string
 	ContentMapperSpawner contentmapper.Spawner
 }
 
@@ -97,8 +98,14 @@ func (s *StdioServer) Run(ctx context.Context) error {
 		Spawner: s.options.ContentMapperSpawner,
 	}
 
+	var sdkPluginExecutor *nodeOhSdkPluginExecutor
+	if s.options.RunExternalCode {
+		sdkPluginExecutor = newNodeOhSdkPluginExecutor(ctx, s.options.NodeExecutable, s.options.Err)
+		defer sdkPluginExecutor.Close()
+	}
 	session := NewStandaloneSession(sessionInit, &SessionOptions{
-		UseBinaryResponses: !s.options.Async, // Only msgpack uses binary responses
+		UseBinaryResponses:  !s.options.Async, // Only msgpack uses binary responses
+		OhSdkPluginExecutor: sdkPluginExecutor,
 	})
 	defer session.Close()
 

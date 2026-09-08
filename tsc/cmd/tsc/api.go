@@ -21,6 +21,7 @@ type apiFlags struct {
 	async           bool
 	timing          bool
 	runExternalCode bool
+	nodeExecutable  string
 }
 
 func parseAPIFlags(args []string) (apiFlags, error) {
@@ -32,6 +33,7 @@ func parseAPIFlags(args []string) (apiFlags, error) {
 	flags.BoolVar(&result.async, "async", false, "use JSON-RPC protocol instead of MessagePack (for async API)")
 	flags.BoolVar(&result.timing, "timing", false, "collect per-request server processing time, folded into the client's timing snapshot")
 	flags.BoolVar(&result.runExternalCode, "runExternalCode", false, "allow projects to execute configured external plugins")
+	flags.StringVar(&result.nodeExecutable, "nodeExecutable", "node", "Node.js executable used for configured JavaScript plugins")
 	if err := flags.Parse(args); err != nil {
 		return apiFlags{}, err
 	}
@@ -60,6 +62,7 @@ func runAPI(args []string) int {
 		Async:                flags.async,
 		CollectTiming:        flags.timing,
 		RunExternalCode:      flags.runExternalCode,
+		NodeExecutable:       flags.nodeExecutable,
 		ContentMapperSpawner: newSystem(),
 	}
 	if flags.pipePath != "" {

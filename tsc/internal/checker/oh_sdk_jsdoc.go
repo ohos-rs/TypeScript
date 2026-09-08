@@ -28,6 +28,7 @@ const (
 	ohStageModelError    = "11706009#This API is used only in Stage Mode, but the current Mode is FA."
 	ohAtomicServiceError = "11706010#'{0}' can't support atomicservice application."
 	ohFindModuleWarning  = "Cannot find name '{0}'."
+	ohDefaultSDKMarking  = "This API has been Special Markings. exercise caution when using this API."
 )
 
 var (
@@ -136,7 +137,7 @@ func (c *Checker) checkOHSDKDeclarationUse(node *ast.Node, declaration *ast.Node
 		return
 	}
 	c.checkOHSinceUse(node, declaration, contract)
-	c.checkOHSyscapUse(node, contract)
+	c.checkOHSyscapUse(node, declaration, contract)
 	c.checkOHPermissionUse(node, contract)
 	c.checkOHPresenceTags(node, contract)
 }
@@ -369,9 +370,9 @@ func (c *Checker) ohVersionRangeIntersectsCompileSDK(comment string) bool {
 	if !ok {
 		return false
 	}
-	startValue := parseOHRangeVersion(start)
-	endValue := parseOHRangeVersion(end)
-	sdkValue := parseOHRangeVersion(strconv.Itoa(c.ohCompileSDKVersion()))
+	startValue := c.parseOHRangeVersion(start)
+	endValue := c.parseOHRangeVersion(end)
+	sdkValue := c.parseOHRangeVersion(strconv.Itoa(c.ohCompileSDKVersion()))
 	minimum, maximum := min(startValue, endValue), max(startValue, endValue)
 	return sdkValue >= minimum && sdkValue <= maximum
 }
@@ -380,8 +381,12 @@ func (c *Checker) ohVersionRangeIntersectsCompileSDK(comment string) bool {
 // point-version comparator used by @since. Version ranges accept only a
 // one/two-digit integer or a three-part one/two-digit M.S.F value for the
 // OpenHarmony checker; unrecognized values compare as zero.
-func parseOHRangeVersion(version string) int {
+func (c *Checker) parseOHRangeVersion(version string) int {
 	version = strings.TrimSpace(version)
+	if match, configured := c.ohSdkMatchBuildVersion("since", version); configured && match.Matched && len(match.Groups) > 4 {
+		value, _ := strconv.Atoi(match.Groups[4])
+		return value * 10000
+	}
 	if matched, _ := regexp.MatchString(`^\d{1,2}$`, version); matched {
 		value, _ := strconv.Atoi(version)
 		return value * 10000
@@ -407,10 +412,17 @@ func (c *Checker) checkOHSinceUse(node *ast.Node, declaration *ast.Node, contrac
 	tag, exists := contract.first("since")
 	compatible := c.ohCompatibleSDKVersion()
 	version := strings.TrimSpace(tag.comment)
-	if !exists || !c.ohHasConfiguredCompatibleSDK() || compatible == "" || version == "" || !ohSinceFormatPattern.MatchString(version) || compareOHSDKVersions(compatible, version) >= 0 || !c.isOHProjectFile(ast.GetSourceFileOfNode(node).FileName()) {
+	if !exists || !c.ohHasConfiguredCompatibleSDK() || compatible == "" || version == "" || !ohSinceFormatPattern.MatchString(version) || !c.isOHProjectFile(ast.GetSourceFileOfNode(node).FileName()) {
 		return
 	}
-	if c.ohSuppressesSDKWarning(node, declaration, "since", version) {
+	compatibleResult := compareOHSDKVersions(compatible, version) >= 0
+	if result, configured := c.ohSdkCheckValue("since", version, compatible, 0); configured {
+		compatibleResult = result.Result
+	}
+	if compatibleResult {
+		return
+	}
+	if c.ohSuppressesSDKWarning(node, declaration, "since", version, nil) {
 		return
 	}
 	message := strings.NewReplacer("$SINCE1", version, "$SINCE2", compatible).Replace(ohSinceWarning)
@@ -420,7 +432,7 @@ func (c *Checker) checkOHSinceUse(node *ast.Node, declaration *ast.Node, contrac
 	c.addOHSDKUseDiagnostic(node, message, c.ohSDKCategory())
 }
 
-func (c *Checker) checkOHSyscapUse(node *ast.Node, contract ohSDKJSDocContract) {
+func (c *Checker) checkOHSyscapUse(node *ast.Node, declaration *ast.Node, contract ohSDKJSDocContract) {
 	if len(c.compilerOptions.OhDeviceTypes) == 0 {
 		return
 	}
@@ -428,10 +440,21 @@ func (c *Checker) checkOHSyscapUse(node *ast.Node, contract ohSDKJSDocContract) 
 	if !exists {
 		tag.comment = ""
 	}
-	if slices.Contains(c.compilerOptions.OhSyscapIntersection, tag.comment) || c.ohSuppressesSDKWarning(node, nil, "syscap", tag.comment) {
+	if !slices.Contains(c.compilerOptions.OhSyscapIntersection, tag.comment) {
+		if !c.ohSuppressesSDKWarning(node, nil, "syscap", tag.comment, nil) {
+			c.addOHSDKUseDiagnostic(node, ohSyscapWarning, diagnostics.CategoryWarning)
+		}
 		return
 	}
-	c.addOHSDKUseDiagnostic(node, ohSyscapWarning, diagnostics.CategoryWarning)
+	result, configured := c.ohSdkCheckSyscap(node, declaration)
+	if !configured || !result.CheckResult || c.ohSuppressesSDKWarning(node, nil, "syscap", tag.comment, nil) {
+		return
+	}
+	message := result.CheckMessage
+	if message == "" {
+		message = ohDefaultSDKMarking
+	}
+	c.addOHSDKUseDiagnostic(node, message, diagnostics.CategoryWarning)
 }
 
 func (c *Checker) checkOHPermissionUse(node *ast.Node, contract ohSDKJSDocContract) {
@@ -447,7 +470,7 @@ func (c *Checker) checkOHPermissionUse(node *ast.Node, contract ohSDKJSDocContra
 		if comment == "" || (ohPermissionExpression{source: comment, granted: c.compilerOptions.OhRequestPermissions}).valid() {
 			continue
 		}
-		if c.ohSuppressesSDKWarning(node, nil, "permission", "") {
+		if c.ohSuppressesSDKWarning(node, nil, "permission", "", nil) {
 			continue
 		}
 		missing = append(missing, comment)
@@ -526,10 +549,17 @@ func (c *Checker) checkOHAvailableUse(node *ast.Node, declaration *ast.Node, con
 	}
 	c.ohAvailableNodeChecks[key] = struct{}{}
 	version, ok := c.ohAvailableDecoratorVersion(declaration)
-	if !ok || compatible == "" || compareOHSDKVersions(compatible, version.version) >= 0 {
+	if !ok || compatible == "" {
 		return
 	}
-	if c.ohSuppressesSDKWarning(node, declaration, "available", version.version) {
+	compatibleResult := compareOHSDKVersions(compatible, version.version) >= 0
+	if result, configured := c.ohSdkCheckValue("available", version.formatVersion, compatible, 0); configured {
+		compatibleResult = result.Result
+	}
+	if compatibleResult {
+		return
+	}
+	if c.ohSuppressesSDKWarning(node, declaration, "available", version.version, &version) {
 		return
 	}
 	// getAvailableCheckConfig uses the `since` tag as the presence gate. Once
@@ -572,7 +602,7 @@ func (c *Checker) ohAvailableDecoratorVersion(node *ast.Node) (ohParsedVersion, 
 					continue
 				}
 				version := parseOHAvailableVersion(initializer.Text())
-				if validateOHAvailableVersion(version, c.ohRuntimeOS()).valid {
+				if c.validateOHAvailableVersion(version).valid {
 					return version, true
 				}
 			}
@@ -581,16 +611,16 @@ func (c *Checker) ohAvailableDecoratorVersion(node *ast.Node) (ohParsedVersion, 
 	return ohParsedVersion{}, false
 }
 
-func (c *Checker) ohSuppressesSDKWarning(node *ast.Node, declaration *ast.Node, warning string, value string) bool {
+func (c *Checker) ohSuppressesSDKWarning(node *ast.Node, declaration *ast.Node, warning string, value string, available *ohParsedVersion) bool {
 	if c.ohSuppressWarningsAnnotation(node, warning) || c.ohSuppressWarningsComment(node, warning) {
 		return true
 	}
 	switch warning {
 	case "since":
 		return c.ohUseInTry(node) || c.ohUseUnderUndefinedCheck(node) || c.ohSDKWhitelist(declaration) ||
-			c.ohUseUnderAvailable(node, value) || c.ohUseUnderSDKGuard(node, value)
+			c.ohUseUnderAvailable(node, value, nil) || c.ohUseUnderSDKGuard(node, value, nil)
 	case "available":
-		return c.ohUseUnderAvailable(node, value) || c.ohUseUnderSDKGuard(node, value)
+		return c.ohUseUnderAvailable(node, value, available) || c.ohUseUnderSDKGuard(node, value, available)
 	case "syscap":
 		return c.ohUseUnderCanIUse(node, value)
 	default:
@@ -822,15 +852,29 @@ func (c *Checker) ohSDKWhitelist(declaration *ast.Node) bool {
 	return false
 }
 
-func (c *Checker) ohUseUnderAvailable(node *ast.Node, required string) bool {
+func (c *Checker) ohUseUnderAvailable(node *ast.Node, required string, requiredAvailable *ohParsedVersion) bool {
 	if !c.isOHProjectFile(ast.GetSourceFileOfNode(node).FileName()) || !strings.Contains(ast.GetSourceFileOfNode(node).Text(), "@Available") {
 		return false
 	}
 	version, ok := c.ohAvailableDecoratorVersion(node)
-	return ok && compareOHSDKVersions(version.version, required) >= 0
+	if !ok {
+		return false
+	}
+	scene := 2
+	if version.os == ohRuntimeOS {
+		scene = 1
+	}
+	pluginRequired := required
+	if requiredAvailable != nil {
+		pluginRequired = requiredAvailable.formatVersion
+	}
+	if result, configured := c.ohSdkCheckValue("available", pluginRequired, version.formatVersion, scene); configured {
+		return result.Result
+	}
+	return compareOHSDKVersions(version.version, required) >= 0
 }
 
-func (c *Checker) ohUseUnderSDKGuard(node *ast.Node, required string) bool {
+func (c *Checker) ohUseUnderSDKGuard(node *ast.Node, required string, requiredAvailable *ohParsedVersion) bool {
 	file := ast.GetSourceFileOfNode(node)
 	if file == nil || !strings.Contains(file.Text(), "deviceInfo") {
 		return false
@@ -840,14 +884,14 @@ func (c *Checker) ohUseUnderSDKGuard(node *ast.Node, required string) bool {
 			continue
 		}
 		condition := current.Expression()
-		if c.ohApiAvailableGuard(condition, required) || c.ohSDKVersionGuard(condition, required) {
+		if c.ohApiAvailableGuard(condition, required, requiredAvailable) || c.ohSDKVersionGuard(condition, required, requiredAvailable) {
 			return true
 		}
 	}
 	return false
 }
 
-func (c *Checker) ohApiAvailableGuard(condition *ast.Node, required string) bool {
+func (c *Checker) ohApiAvailableGuard(condition *ast.Node, required string, requiredAvailable *ohParsedVersion) bool {
 	if !ast.IsCallExpression(condition) || len(condition.Arguments()) != 1 {
 		return false
 	}
@@ -867,13 +911,56 @@ func (c *Checker) ohApiAvailableGuard(condition *ast.Node, required string) bool
 		return false
 	}
 	argumentText := strings.NewReplacer("'", "", "\"", "", "`", "", "|", "").Replace(strings.TrimSpace(scanner.GetTextOfNode(argument)))
-	if !ohAvailableFormatPattern.MatchString(argumentText) {
+	if c.ohRuntimeOS() == ohRuntimeOS {
+		if !ohAvailableFormatPattern.MatchString(argumentText) {
+			return false
+		}
+		return compareOHSDKVersions(argumentText, required) >= 0
+	}
+
+	distributionRequired := required
+	if ohMSFPattern.MatchString(required) && strings.Contains(required, "(") {
+		if converted, configured := c.ohSdkCheckDistribution("since", required); configured && converted.Valid {
+			distributionRequired = converted.Version
+		}
+	}
+	parts := strings.Split(argumentText, ".")
+	if len(parts) == 1 {
+		if !ohAvailableFormatPattern.MatchString(argumentText) {
+			return false
+		}
+		return compareOHSDKVersions(argumentText, distributionRequired) >= 0
+	}
+	match := ohMSFPattern.FindStringSubmatch(argumentText)
+	if len(match) == 0 {
 		return false
 	}
-	return compareOHSDKVersions(argumentText, required) >= 0
+	major := parseDecimal(match[1])
+	if major < ohMSFIntegerVersion {
+		distribution, configured := c.ohSdkCheckDistribution("since", argumentText)
+		if !configured || !distribution.Valid {
+			return false
+		}
+		scene := 2
+		if matchedAPI == "apiAvailable" {
+			scene = 1
+		}
+		// api_validate_utils.ts::checkDistributionOSVersion always passes the
+		// checker's minRequiredVersion here. Unlike the sibling SDK-version
+		// comparison path, this apiAvailable path does not substitute the
+		// OS-qualified ParsedVersion used by @Available.
+		if result, configured := c.ohSdkCheckValue("since", required, argumentText, scene); configured {
+			return result.Result
+		}
+		return compareOHSDKVersions(argumentText, required) >= 0
+	}
+	if !strings.Contains(argumentText, ".") && parseDecimal(argumentText) >= ohMSFIntegerVersion {
+		return false
+	}
+	return compareOHSDKVersions(argumentText, distributionRequired) >= 0
 }
 
-func (c *Checker) ohSDKVersionGuard(condition *ast.Node, required string) bool {
+func (c *Checker) ohSDKVersionGuard(condition *ast.Node, required string, requiredAvailable *ohParsedVersion) bool {
 	if parts := strings.Split(required, "."); len(parts) >= 3 && parseDecimal(parts[0]) > ohMSFIntegerVersion {
 		return false
 	}
@@ -915,7 +1002,21 @@ func (c *Checker) ohSDKVersionGuard(condition *ast.Node, required string) bool {
 	default:
 		return false
 	}
-	return compareOHSDKVersions(strconv.Itoa(assigned), required) >= 0
+	assignedVersion := strconv.Itoa(assigned)
+	if c.ohRuntimeOS() != ohRuntimeOS {
+		scene := 2
+		if apiName == "sdkApiVersion" {
+			scene = 1
+		}
+		pluginRequired := required
+		if requiredAvailable != nil {
+			pluginRequired = requiredAvailable.formatVersion
+		}
+		if result, configured := c.ohSdkCheckValue("since", pluginRequired, assignedVersion, scene); configured {
+			return result.Result
+		}
+	}
+	return compareOHSDKVersions(assignedVersion, required) >= 0
 }
 
 func (c *Checker) ohSDKGuardValue(node *ast.Node) (int, bool) {

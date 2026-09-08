@@ -430,7 +430,8 @@ type Session struct {
 	// snapshots. Lock ordering is updateMu -> snapshotsMu (never the reverse).
 	updateMu sync.Mutex
 
-	cpuProfiler pprof.CPUProfiler
+	cpuProfiler         pprof.CPUProfiler
+	ohSdkPluginExecutor core.OhSdkPluginExecutor
 }
 
 type batchResponsePage struct {
@@ -443,7 +444,8 @@ var _ ipc.Handler = (*Session)(nil)
 // SessionOptions configures an API session.
 type SessionOptions struct {
 	// UseBinaryResponses enables binary responses for msgpack protocol.
-	UseBinaryResponses bool
+	UseBinaryResponses  bool
+	OhSdkPluginExecutor core.OhSdkPluginExecutor
 }
 
 // DefaultMaxResponseBytesPerPage leaves room for base64 expansion beneath V8's
@@ -478,6 +480,7 @@ func newSession(snapshotHost *project.SnapshotHost, withLocale func(context.Cont
 	}
 	if options != nil {
 		s.useBinaryResponses = options.UseBinaryResponses
+		s.ohSdkPluginExecutor = options.OhSdkPluginExecutor
 	}
 	return s
 }
@@ -1329,6 +1332,21 @@ func (s *Session) handleCreateProgram(ctx context.Context, params *CreateProgram
 	rootFileNames := make([]string, len(params.RootFiles))
 	for i, rootFile := range params.RootFiles {
 		rootFileNames[i] = rootFile.ToAbsoluteFileName(s.currentDirectory())
+	}
+	params.CreateProgramOptions.CompilerOptions.OhSdkPluginExecutor = s.ohSdkPluginExecutor
+	if s.ohSdkPluginExecutor != nil {
+		plugins := params.CreateProgramOptions.CompilerOptions.OhSdkClassCheckPlugins
+		loaded := make([]core.OhSdkClassCheckPlugin, 0, len(plugins))
+		for _, plugin := range plugins {
+			found, err := s.ohSdkPluginExecutor.PrepareClass(plugin)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize OH SDK checker %s#%s: %w", plugin.Path, plugin.ClassName, err)
+			}
+			if found {
+				loaded = append(loaded, plugin)
+			}
+		}
+		params.CreateProgramOptions.CompilerOptions.OhSdkClassCheckPlugins = loaded
 	}
 
 	var oldSnapshot *project.Snapshot
