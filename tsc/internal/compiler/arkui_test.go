@@ -236,6 +236,79 @@ func TestArkUIUsesOpenHarmony49FileCasingDefault(t *testing.T) {
 	}
 }
 
+func TestArkUIUsesOpenHarmony49IterableDeclarations(t *testing.T) {
+	t.Parallel()
+
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/lib.d.ts": `
+			interface SymbolConstructor { readonly iterator: unique symbol; }
+			declare var Symbol: SymbolConstructor;
+			interface IteratorYieldResult<TYield> { done?: false; value: TYield; }
+			interface IteratorReturnResult<TReturn> { done: true; value: TReturn; }
+			type IteratorResult<T, TReturn = any> = IteratorYieldResult<T> | IteratorReturnResult<TReturn>;
+			interface Iterator<T, TReturn = any, TNext = undefined> { next(...args: [] | [TNext]): IteratorResult<T, TReturn>; }
+			interface Iterable<T> { [Symbol.iterator](): Iterator<T>; }
+			interface IterableIterator<T> extends Iterator<T> { [Symbol.iterator](): IterableIterator<T>; }
+			interface Set<T> extends Iterable<T> {}
+			declare const values: Set<number>;
+		`,
+		"/input.ts": `for (const value of values) { const checked: number = value; }`,
+	}, true))
+	program := compiler.NewProgram(compiler.ProgramOptions{
+		Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+			FileNames: []string{"/lib.d.ts", "/input.ts"},
+			CompilerOptions: &core.CompilerOptions{
+				NoEmit:        core.TSTrue,
+				NoLib:         core.TSTrue,
+				Target:        core.ScriptTargetES2021,
+				EtsLoaderPath: "/loader",
+			},
+		}},
+		Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+	})
+	if diagnostics := program.GetSemanticDiagnostics(t.Context(), nil); len(diagnostics) != 0 {
+		t.Fatalf("OH 4.9 Iterable<T> declarations must remain iterable: %v", diagnostics)
+	}
+}
+
+func TestArkUIUsesOpenHarmony49NumericEnumAssignability(t *testing.T) {
+	t.Parallel()
+
+	const source = `
+		enum CommunicationType { Request = 1, Response = 2 }
+		declare function send(value: CommunicationType): void;
+		send(-1);
+		const value: CommunicationType = -1;
+	`
+	check := func(loaderPath string) []int32 {
+		fs := bundled.WrapFS(vfstest.FromMap(map[string]string{"/input.ts": source}, true))
+		program := compiler.NewProgram(compiler.ProgramOptions{
+			Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+				FileNames: []string{"/input.ts"},
+				CompilerOptions: &core.CompilerOptions{
+					NoEmit:        core.TSTrue,
+					Target:        core.ScriptTargetES2021,
+					EtsLoaderPath: loaderPath,
+				},
+			}},
+			Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+		})
+		return core.Map(program.GetSemanticDiagnostics(t.Context(), nil), func(diagnostic *ast.Diagnostic) int32 {
+			return diagnostic.Code()
+		})
+	}
+
+	ordinary := check("")
+	for _, code := range []int32{2322, 2345} {
+		if !slices.Contains(ordinary, code) {
+			t.Fatalf("ordinary TypeScript lost TS%d: %v", code, ordinary)
+		}
+	}
+	if openHarmony := check("/loader"); len(openHarmony) != 0 {
+		t.Fatalf("OH 4.9 numeric enum assignments must remain compatible: %v", openHarmony)
+	}
+}
+
 func TestArkUISourceOwnedDiagnostics(t *testing.T) {
 	t.Parallel()
 

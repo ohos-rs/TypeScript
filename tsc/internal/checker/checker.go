@@ -1119,17 +1119,24 @@ func newChecker(program Program, options *core.CompilerOptions, isForArkTSLinter
 	c.getGlobalOmitSymbol = c.getGlobalTypeAliasResolver("Omit", 2 /*arity*/, true /*reportErrors*/)
 	c.getGlobalNoInferSymbolOrNil = c.getGlobalTypeAliasResolver("NoInfer", 1 /*arity*/, false /*reportErrors*/)
 	c.getGlobalIteratorType = c.getGlobalTypeResolver("Iterator", 3 /*arity*/, false /*reportErrors*/)
-	c.getGlobalIterableType = c.getGlobalTypeResolver("Iterable", 3 /*arity*/, false /*reportErrors*/)
-	c.getGlobalIterableTypeChecked = c.getGlobalTypeResolver("Iterable", 3 /*arity*/, true /*reportErrors*/)
-	c.getGlobalIterableIteratorType = c.getGlobalTypeResolver("IterableIterator", 3 /*arity*/, false /*reportErrors*/)
-	c.getGlobalIterableIteratorTypeChecked = c.getGlobalTypeResolver("IterableIterator", 3 /*arity*/, true /*reportErrors*/)
+	iterableArity := 3
+	if c.compilerOptions.EtsLoaderPath != "" {
+		// OpenHarmony 4.9 declares Iterable<T> and IterableIterator<T> with a
+		// single type parameter. Newer TypeScript libraries expanded both to
+		// <TYield, TReturn, TNext>.
+		iterableArity = 1
+	}
+	c.getGlobalIterableType = c.getGlobalTypeResolver("Iterable", iterableArity, false /*reportErrors*/)
+	c.getGlobalIterableTypeChecked = c.getGlobalTypeResolver("Iterable", iterableArity, true /*reportErrors*/)
+	c.getGlobalIterableIteratorType = c.getGlobalTypeResolver("IterableIterator", iterableArity, false /*reportErrors*/)
+	c.getGlobalIterableIteratorTypeChecked = c.getGlobalTypeResolver("IterableIterator", iterableArity, true /*reportErrors*/)
 	c.getGlobalIteratorObjectType = c.getGlobalTypeResolver("IteratorObject", 3 /*arity*/, false /*reportErrors*/)
 	c.getGlobalGeneratorType = c.getGlobalTypeResolver("Generator", 3 /*arity*/, false /*reportErrors*/)
 	c.getGlobalAsyncIteratorType = c.getGlobalTypeResolver("AsyncIterator", 3 /*arity*/, false /*reportErrors*/)
-	c.getGlobalAsyncIterableType = c.getGlobalTypeResolver("AsyncIterable", 3 /*arity*/, false /*reportErrors*/)
-	c.getGlobalAsyncIterableTypeChecked = c.getGlobalTypeResolver("AsyncIterable", 3 /*arity*/, true /*reportErrors*/)
-	c.getGlobalAsyncIterableIteratorType = c.getGlobalTypeResolver("AsyncIterableIterator", 3 /*arity*/, false /*reportErrors*/)
-	c.getGlobalAsyncIterableIteratorTypeChecked = c.getGlobalTypeResolver("AsyncIterableIterator", 3 /*arity*/, true /*reportErrors*/)
+	c.getGlobalAsyncIterableType = c.getGlobalTypeResolver("AsyncIterable", iterableArity, false /*reportErrors*/)
+	c.getGlobalAsyncIterableTypeChecked = c.getGlobalTypeResolver("AsyncIterable", iterableArity, true /*reportErrors*/)
+	c.getGlobalAsyncIterableIteratorType = c.getGlobalTypeResolver("AsyncIterableIterator", iterableArity, false /*reportErrors*/)
+	c.getGlobalAsyncIterableIteratorTypeChecked = c.getGlobalTypeResolver("AsyncIterableIterator", iterableArity, true /*reportErrors*/)
 	c.getGlobalAsyncIteratorObjectType = c.getGlobalTypeResolver("AsyncIteratorObject", 3 /*arity*/, false /*reportErrors*/)
 	c.getGlobalAsyncGeneratorType = c.getGlobalTypeResolver("AsyncGenerator", 3 /*arity*/, false /*reportErrors*/)
 	c.getGlobalIteratorYieldResultType = c.getGlobalTypeResolver("IteratorYieldResult", 1 /*arity*/, false /*reportErrors*/)
@@ -6374,9 +6381,21 @@ func (c *Checker) getIteratedTypeOrElementType(use IterationUse, inputType *Type
 		return nil
 	}
 	iterableExists := c.getGlobalIterableType() != c.emptyGenericType
+	uplevelIteration := c.languageVersion >= core.ScriptTargetES2015
+	downlevelIteration := !uplevelIteration && c.compilerOptions.DownlevelIteration == core.TSTrue
+	checkIterable := iterableExists || allowAsyncIterables
+	iterableErrorNode := core.IfElse(iterableExists, errorNode, nil)
+	returnMissingIteration := iterableExists
+	if c.compilerOptions.EtsLoaderPath != "" {
+		// OH 4.9 gates iterable semantics on the emit target (or explicit
+		// downlevel iteration), rather than merely on whether Iterable exists.
+		checkIterable = uplevelIteration || downlevelIteration || allowAsyncIterables
+		iterableErrorNode = core.IfElse(uplevelIteration, errorNode, nil)
+		returnMissingIteration = uplevelIteration
+	}
 	possibleOutOfBounds := c.compilerOptions.NoUncheckedIndexedAccess == core.TSTrue && use&IterationUsePossiblyOutOfBounds != 0
-	if iterableExists || allowAsyncIterables {
-		iterationTypes := c.getIterationTypesOfIterable(inputType, use, core.IfElse(iterableExists, errorNode, nil))
+	if checkIterable {
+		iterationTypes := c.getIterationTypesOfIterable(inputType, use, iterableErrorNode)
 		if checkAssignability {
 			if iterationTypes.nextType != nil {
 				var diagnostic *diagnostics.Message
@@ -6395,7 +6414,7 @@ func (c *Checker) getIteratedTypeOrElementType(use IterationUse, inputType *Type
 				}
 			}
 		}
-		if iterationTypes.yieldType != nil || iterableExists {
+		if iterationTypes.yieldType != nil || returnMissingIteration {
 			if iterationTypes.yieldType == nil {
 				return nil
 			}
@@ -6444,7 +6463,7 @@ func (c *Checker) getIteratedTypeOrElementType(use IterationUse, inputType *Type
 			// number and string input is allowed, we want to say that number is not an
 			// array type or a string type.
 			allowsStrings := use&IterationUseAllowsStringInputFlag != 0 && !hasStringConstituent
-			defaultDiagnostic, maybeMissingAwait := c.getIterationDiagnosticDetails(use, inputType, allowsStrings)
+			defaultDiagnostic, maybeMissingAwait := c.getIterationDiagnosticDetails(use, inputType, allowsStrings, downlevelIteration)
 			c.errorAndMaybeSuggestAwait(errorNode, maybeMissingAwait && c.getAwaitedTypeOfPromise(arrayType) != nil, defaultDiagnostic, c.TypeToString(arrayType))
 		}
 		if hasStringConstituent {
@@ -6623,6 +6642,13 @@ func (c *Checker) getIterationTypesOfIterableFast(t *Type, r *IterationTypesReso
 	// - `IteratorObject<T, TReturn, TNext>` or `AsyncIteratorObject<T, TReturn, TNext>`
 	// - `IterableIterator<T, TReturn, TNext>` or `AsyncIterableIterator<T, TReturn, TNext>`
 	// - `Generator<T, TReturn, TNext>` or `AsyncGenerator<T, TReturn, TNext>`
+	if c.compilerOptions.EtsLoaderPath != "" &&
+		(c.isReferenceToType(t, r.getGlobalIterableType()) || c.isReferenceToType(t, r.getGlobalIterableIteratorType())) {
+		// OH Iterable and IterableIterator expose only TYield. Resolve their
+		// return and next types from the iterator members in the slow path, as
+		// the OH 4.9 checker does.
+		return IterationTypes{}
+	}
 	if c.isReferenceToType(t, r.getGlobalIterableType()) ||
 		c.isReferenceToType(t, r.getGlobalIteratorObjectType()) ||
 		c.isReferenceToType(t, r.getGlobalIterableIteratorType()) ||
@@ -6772,6 +6798,11 @@ func (c *Checker) getIterationTypesOfIteratorFast(t *Type, r *IterationTypesReso
 	// - `IteratorObject<T, TReturn, TNext>` or `AsyncIteratorObject<T, TReturn, TNext>`
 	// - `IterableIterator<T, TReturn, TNext>` or `AsyncIterableIterator<T, TReturn, TNext>`
 	// - `Generator<T, TReturn, TNext>` or `AsyncGenerator<T, TReturn, TNext>`
+	if c.compilerOptions.EtsLoaderPath != "" && c.isReferenceToType(t, r.getGlobalIterableIteratorType()) {
+		// See getIterationTypesOfIterableFast: OH derives the remaining
+		// iteration types from IterableIterator<T>'s members.
+		return IterationTypes{}
+	}
 	if c.isReferenceToType(t, r.getGlobalIteratorType()) ||
 		c.isReferenceToType(t, r.getGlobalIteratorObjectType()) ||
 		c.isReferenceToType(t, r.getGlobalIterableIteratorType()) ||
@@ -6969,11 +7000,17 @@ func (c *Checker) reportTypeNotIterableError(errorNode *ast.Node, t *Type, allow
 		ast.IsForOfStatement(errorNode.Parent) &&
 		errorNode.Parent.Expression() == errorNode &&
 		c.getGlobalAsyncIterableType() != c.emptyGenericType &&
-		c.isTypeAssignableTo(t, c.createTypeFromGenericGlobalType(c.getGlobalAsyncIterableType(), []*Type{c.anyType, c.anyType, c.anyType})))
+		c.isTypeAssignableTo(t, c.createTypeFromGenericGlobalType(c.getGlobalAsyncIterableType(), c.openHarmonyIterableTypeArguments(c.anyType))))
 	return c.errorAndMaybeSuggestAwait(errorNode, suggestAwait, message, c.TypeToString(t))
 }
 
-func (c *Checker) getIterationDiagnosticDetails(use IterationUse, inputType *Type, allowsStrings bool) (*diagnostics.Message, bool) {
+func (c *Checker) getIterationDiagnosticDetails(use IterationUse, inputType *Type, allowsStrings bool, downlevelIteration bool) (*diagnostics.Message, bool) {
+	if c.compilerOptions.EtsLoaderPath != "" && downlevelIteration {
+		if allowsStrings {
+			return diagnostics.Type_0_is_not_an_array_type_or_a_string_type_or_does_not_have_a_Symbol_iterator_method_that_returns_an_iterator, true
+		}
+		return diagnostics.Type_0_is_not_an_array_type_or_does_not_have_a_Symbol_iterator_method_that_returns_an_iterator, true
+	}
 	yieldType := c.getIterationTypeOfIterable(use, IterationTypeKindYield, inputType, nil /*errorNode*/)
 	if yieldType != nil {
 		return diagnostics.Type_0_can_only_be_iterated_through_when_using_the_downlevelIteration_flag_or_with_a_target_of_es2015_or_higher, false
@@ -21083,6 +21120,9 @@ func (c *Checker) createGeneratorType(yieldType *Type, returnType *Type, nextTyp
 		// Fall back to the global IterableIterator type.
 		globalIterableIteratorType := resolver.getGlobalIterableIteratorType()
 		if globalIterableIteratorType != c.emptyGenericType {
+			if c.compilerOptions.EtsLoaderPath != "" {
+				return c.createTypeFromGenericGlobalType(globalIterableIteratorType, []*Type{yieldType})
+			}
 			return c.createTypeFromGenericGlobalType(globalIterableIteratorType, []*Type{yieldType, returnType, nextType})
 		}
 		// The global Generator type doesn't exist, so report an error
@@ -25376,7 +25416,14 @@ func (c *Checker) getGlobalImportMetaExpressionType() *Type {
 }
 
 func (c *Checker) createIterableType(iteratedType *Type) *Type {
-	return c.createTypeFromGenericGlobalType(c.getGlobalIterableTypeChecked(), []*Type{iteratedType, c.voidType, c.undefinedType})
+	return c.createTypeFromGenericGlobalType(c.getGlobalIterableTypeChecked(), c.openHarmonyIterableTypeArguments(iteratedType))
+}
+
+func (c *Checker) openHarmonyIterableTypeArguments(iteratedType *Type) []*Type {
+	if c.compilerOptions.EtsLoaderPath != "" {
+		return []*Type{iteratedType}
+	}
+	return []*Type{iteratedType, c.voidType, c.undefinedType}
 }
 
 func (c *Checker) createArrayType(elementType *Type) *Type {
