@@ -20,9 +20,9 @@ type OhSdkClassCheckPlugin struct {
 	ClassName string `json:"className"`
 }
 
-// OhSdkPluginNodeSnapshot carries the exact source range needed to recreate
-// the TypeScript Node object passed by checkSyscapAbility. Source text is sent
-// because API sessions may own callback-backed files that are not on disk.
+// OhSdkPluginNodeSnapshot carries the exact source range needed by the
+// JavaScript SDK plugin ABI. Pos and End use JavaScript/TypeScript UTF-16 code
+// units; source text is included because API sessions may own virtual files.
 type OhSdkPluginNodeSnapshot struct {
 	FileName string `json:"fileName"`
 	Source   string `json:"source"`

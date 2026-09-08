@@ -17,7 +17,6 @@ import (
 type StdioServerOptions struct {
 	In                 io.ReadCloser
 	Out                io.WriteCloser
-	Err                io.Writer
 	Cwd                string
 	DefaultLibraryPath string
 	// PipePath, if set, listens on a named pipe (Windows) or Unix domain
@@ -36,8 +35,10 @@ type StdioServerOptions struct {
 	// on demand via getServerTiming / resetServerTiming requests.
 	CollectTiming bool
 	// RunExternalCode allows configured content mappers to execute.
-	RunExternalCode      bool
-	NodeExecutable       string
+	RunExternalCode bool
+	// OhSdkPluginCallbacks delegates SDK CommonJS checker exports to the API
+	// client. TSGO itself never owns a JavaScript runtime.
+	OhSdkPluginCallbacks bool
 	ContentMapperSpawner contentmapper.Spawner
 }
 
@@ -98,10 +99,12 @@ func (s *StdioServer) Run(ctx context.Context) error {
 		Spawner: s.options.ContentMapperSpawner,
 	}
 
-	var sdkPluginExecutor *nodeOhSdkPluginExecutor
-	if s.options.RunExternalCode {
-		sdkPluginExecutor = newNodeOhSdkPluginExecutor(ctx, s.options.NodeExecutable, s.options.Err)
-		defer sdkPluginExecutor.Close()
+	if s.options.OhSdkPluginCallbacks && !s.options.Async {
+		return fmt.Errorf("OH SDK plugin callbacks require the asynchronous API protocol")
+	}
+	var sdkPluginExecutor *clientOhSdkPluginExecutor
+	if s.options.OhSdkPluginCallbacks {
+		sdkPluginExecutor = newClientOhSdkPluginExecutor()
 	}
 	session := NewStandaloneSession(sessionInit, &SessionOptions{
 		UseBinaryResponses:  !s.options.Async, // Only msgpack uses binary responses
@@ -132,6 +135,9 @@ func (s *StdioServer) Run(ctx context.Context) error {
 	// If callbacks are enabled, set the connection on the FS
 	if callbackFS != nil {
 		callbackFS.SetConnection(ctx, conn)
+	}
+	if sdkPluginExecutor != nil {
+		sdkPluginExecutor.SetConnection(ctx, conn)
 	}
 
 	return conn.Run(ctx)

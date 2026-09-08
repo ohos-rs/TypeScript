@@ -146,11 +146,12 @@ func (c *Checker) ohSdkCheckSyscap(node *ast.Node, declaration *ast.Node) (core.
 
 func ohSdkPluginNodeSnapshot(node *ast.Node) core.OhSdkPluginNodeSnapshot {
 	file := ast.GetSourceFileOfNode(node)
+	positionMap := file.GetPositionMap()
 	return core.OhSdkPluginNodeSnapshot{
 		FileName: file.FileName(),
 		Source:   file.Text(),
-		Pos:      node.Pos(),
-		End:      node.End(),
+		Pos:      positionMap.UTF8ToUTF16(node.Pos()),
+		End:      positionMap.UTF8ToUTF16(node.End()),
 		Text:     scanner.GetTextOfNode(node),
 	}
 }
