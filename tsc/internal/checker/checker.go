@@ -2913,7 +2913,13 @@ func (c *Checker) checkConstructorDeclaration(node *ast.Node) {
 	}
 	c.checkSourceElement(node.Body())
 	symbol := c.getSymbolOfDeclaration(node)
-	c.checkFunctionOrConstructorSymbol(symbol)
+	// OH checker.ts checkConstructorDeclaration checks a constructor symbol only
+	// from its first declaration. ArkTS structs prepend a virtual constructor,
+	// so checking the explicit declaration again reports both bodies as duplicate
+	// implementations.
+	if ast.GetDeclarationOfKind(symbol, node.Kind) == node {
+		c.checkFunctionOrConstructorSymbol(symbol)
+	}
 	// exit early in the case of signature - super checks are not relevant to them
 	if ast.NodeIsMissing(node.Body()) {
 		return
@@ -11053,7 +11059,9 @@ func (c *Checker) checkNonNullChain(node *ast.Node) *Type {
 func (c *Checker) checkExpressionWithTypeArguments(node *ast.Node) *Type {
 	c.checkGrammarExpressionWithTypeArguments(node)
 	c.checkSourceElements(node.TypeArguments())
-	if ast.IsExpressionWithTypeArguments(node) {
+	// OpenHarmony third_party_typescript 4.9 does not reject an instantiation
+	// expression on the right side of instanceof (TS2848).
+	if c.compilerOptions.EtsLoaderPath == "" && ast.IsExpressionWithTypeArguments(node) {
 		parent := ast.WalkUpParenthesizedExpressions(node.Parent)
 		if ast.IsBinaryExpression(parent) && parent.AsBinaryExpression().OperatorToken.Kind == ast.KindInstanceOfKeyword && isNodeDescendantOf(node, parent.AsBinaryExpression().Right) {
 			c.error(node, diagnostics.The_right_hand_side_of_an_instanceof_expression_must_not_be_an_instantiation_expression)
@@ -13314,6 +13322,12 @@ func (c *Checker) isTypeEqualityComparableTo(source *Type, target *Type) bool {
 func (c *Checker) checkTruthinessOfType(t *Type, node *ast.Node) *Type {
 	if t.flags&TypeFlagsVoid != 0 {
 		c.error(node, diagnostics.An_expression_of_type_void_cannot_be_tested_for_truthiness)
+		return t
+	}
+	// OpenHarmony third_party_typescript 4.9 checkTruthinessOfType stops after
+	// the void check. Keep newer TypeScript syntactic truthiness diagnostics for
+	// ordinary projects, but not for an ETS-loader program.
+	if c.compilerOptions.EtsLoaderPath != "" {
 		return t
 	}
 	semantics := c.getSyntacticTruthySemantics(node)

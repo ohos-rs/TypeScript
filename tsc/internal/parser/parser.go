@@ -324,6 +324,10 @@ func (p *Parser) initializeState(opts ast.SourceFileParseOptions, sourceText str
 	p.scanner.SetText(p.sourceText)
 	p.scanner.SetOnError(p.scanError)
 	p.scanner.SetLanguageVariant(p.languageVariant)
+	// The OH 4.9 scanner behavior applies to every source in an ETS-loader
+	// program, including .ts dependencies. ScriptKindETS covers direct parser
+	// callers that do not construct a compiler host.
+	p.scanner.SetOpenHarmony49(p.scriptKind == core.ScriptKindETS || p.opts.EtsLoaderPath != "")
 }
 
 func (p *Parser) scanError(message *diagnostics.Message, pos int, length int, args ...any) {

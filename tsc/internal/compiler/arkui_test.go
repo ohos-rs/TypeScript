@@ -87,6 +87,116 @@ func TestArkUIProgram(t *testing.T) {
 	}
 }
 
+func TestArkUIStructExplicitConstructorUsesVirtualSignature(t *testing.T) {
+	t.Parallel()
+
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/sdk.d.ets": `declare class LocalStorage {} declare class CustomComponent {}`,
+		"/input.ets": `struct Page { value: string = ""; constructor() { super(); this.value = "ready"; } build() {} }`,
+	}, true))
+	options := &core.CompilerOptions{
+		NoEmit:                 core.TSTrue,
+		Module:                 core.ModuleKindESNext,
+		ModuleResolution:       core.ModuleResolutionKindBundler,
+		ExperimentalDecorators: core.TSTrue,
+		Ets:                    etstest.Options(),
+	}
+	program := compiler.NewProgram(compiler.ProgramOptions{
+		Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+			FileNames:       []string{"/sdk.d.ets", "/input.ets"},
+			CompilerOptions: options,
+		}},
+		Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+	})
+	for _, diagnostic := range program.GetSemanticDiagnostics(t.Context(), nil) {
+		if diagnostic.Code() == 2392 {
+			t.Fatalf("OH virtual constructor must not duplicate the explicit constructor: %v", diagnostic)
+		}
+	}
+}
+
+func TestArkUIUsesOpenHarmony49ExpressionDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	const source = `
+		declare class Box<T> { value: T; }
+		declare const maybeBox: unknown;
+		if ({}) {}
+		if (null) {}
+		maybeBox instanceof Box<number>;
+	`
+	check := func(loaderPath string) []int32 {
+		fs := bundled.WrapFS(vfstest.FromMap(map[string]string{"/input.ts": source}, true))
+		program := compiler.NewProgram(compiler.ProgramOptions{
+			Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+				FileNames: []string{"/input.ts"},
+				CompilerOptions: &core.CompilerOptions{
+					NoEmit:           core.TSTrue,
+					Target:           core.ScriptTargetESNext,
+					Module:           core.ModuleKindESNext,
+					ModuleResolution: core.ModuleResolutionKindBundler,
+					EtsLoaderPath:    loaderPath,
+				},
+			}},
+			Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+		})
+		var codes []int32
+		for _, diagnostic := range program.GetSemanticDiagnostics(t.Context(), nil) {
+			codes = append(codes, diagnostic.Code())
+		}
+		return codes
+	}
+
+	ordinary := check("")
+	for _, code := range []int32{2848, 2872, 2873} {
+		if !slices.Contains(ordinary, code) {
+			t.Fatalf("ordinary TypeScript lost TS%d: %v", code, ordinary)
+		}
+	}
+	openHarmony := check("/loader")
+	for _, code := range []int32{2848, 2872, 2873} {
+		if slices.Contains(openHarmony, code) {
+			t.Fatalf("OpenHarmony 4.9 mode must not report TS%d: %v", code, openHarmony)
+		}
+	}
+}
+
+func TestArkUIUsesOpenHarmony49LegacyEscapeScanning(t *testing.T) {
+	t.Parallel()
+
+	check := func(loaderPath string) []int32 {
+		fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+			"/input.ts": `export const escape = "\033\8";`,
+		}, true))
+		program := compiler.NewProgram(compiler.ProgramOptions{
+			Config: &tsoptions.ParsedCommandLine{ParsedConfig: &tsoptions.ParsedOptions{
+				FileNames: []string{"/input.ts"},
+				CompilerOptions: &core.CompilerOptions{
+					NoEmit:        core.TSTrue,
+					Target:        core.ScriptTargetESNext,
+					EtsLoaderPath: loaderPath,
+				},
+			}},
+			Host: compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil),
+		})
+		var codes []int32
+		for _, diagnostic := range program.GetSyntacticDiagnostics(t.Context(), nil) {
+			codes = append(codes, diagnostic.Code())
+		}
+		return codes
+	}
+
+	ordinary := check("")
+	for _, code := range []int32{1487, 1488} {
+		if !slices.Contains(ordinary, code) {
+			t.Fatalf("ordinary TypeScript lost TS%d: %v", code, ordinary)
+		}
+	}
+	if openHarmony := check("/loader"); len(openHarmony) != 0 {
+		t.Fatalf("OpenHarmony 4.9 scanner reported newer escape diagnostics: %v", openHarmony)
+	}
+}
+
 func TestArkUISourceOwnedDiagnostics(t *testing.T) {
 	t.Parallel()
 

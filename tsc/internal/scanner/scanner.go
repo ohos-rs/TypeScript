@@ -214,6 +214,7 @@ type Scanner struct {
 	end             int
 	languageVariant core.LanguageVariant
 	scriptTarget    core.ScriptTarget
+	openHarmony49   bool
 	onError         ErrorCallback
 	skipTrivia      bool
 	ScannerState
@@ -410,6 +411,10 @@ func (s *Scanner) SetLanguageVariant(languageVariant core.LanguageVariant) {
 
 func (s *Scanner) SetScriptTarget(scriptTarget core.ScriptTarget) {
 	s.scriptTarget = scriptTarget
+}
+
+func (s *Scanner) SetOpenHarmony49(enabled bool) {
+	s.openHarmony49 = enabled
 }
 
 func (s *Scanner) languageVersion() core.ScriptTarget {
@@ -1698,6 +1703,17 @@ func (s *Scanner) scanEscapeSequence(flags EscapeSequenceScanningFlags) string {
 	s.pos++
 	switch ch {
 	case '0':
+		// OpenHarmony third_party_typescript 4.9 scanEscapeSequence consumes
+		// only the zero in ordinary strings. Tagged templates additionally
+		// preserve one following digit as an invalid escape token.
+		if s.openHarmony49 && flags&EscapeSequenceScanningFlagsRegularExpression == 0 {
+			if flags&EscapeSequenceScanningFlagsReportErrors == 0 && stringutil.IsDigit(s.char()) {
+				s.pos++
+				s.tokenFlags |= ast.TokenFlagsContainsInvalidEscape
+				return s.text[start:s.pos]
+			}
+			return "\x00"
+		}
 		// Although '0' preceding any digit is treated as LegacyOctalEscapeSequence,
 		// '\08' should separately be interpreted as '\0' + '8'.
 		if !stringutil.IsDigit(s.char()) {
@@ -1706,6 +1722,9 @@ func (s *Scanner) scanEscapeSequence(flags EscapeSequenceScanningFlags) string {
 		// '\01', '\011'
 		fallthrough
 	case '1', '2', '3':
+		if s.openHarmony49 && flags&EscapeSequenceScanningFlagsRegularExpression == 0 {
+			return string(ch)
+		}
 		// '\1', '\17', '\177'
 		if stringutil.IsOctalDigit(s.char()) {
 			s.pos++
@@ -1713,6 +1732,9 @@ func (s *Scanner) scanEscapeSequence(flags EscapeSequenceScanningFlags) string {
 		// '\17', '\177'
 		fallthrough
 	case '4', '5', '6', '7':
+		if s.openHarmony49 && flags&EscapeSequenceScanningFlagsRegularExpression == 0 {
+			return string(ch)
+		}
 		// '\4', '\47' but not '\477'
 		if stringutil.IsOctalDigit(s.char()) {
 			s.pos++
@@ -1730,6 +1752,9 @@ func (s *Scanner) scanEscapeSequence(flags EscapeSequenceScanningFlags) string {
 		}
 		return s.text[start:s.pos]
 	case '8', '9':
+		if s.openHarmony49 && flags&EscapeSequenceScanningFlagsRegularExpression == 0 {
+			return string(ch)
+		}
 		// the invalid '\8' and '\9'
 		s.tokenFlags |= ast.TokenFlagsContainsInvalidEscape
 		if flags&EscapeSequenceScanningFlagsReportInvalidEscapeErrors != 0 {
