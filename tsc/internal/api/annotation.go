@@ -137,18 +137,20 @@ func (setup checkerSetup) annotationInfoResponse(info *checker.AnnotationInfo) *
 // OH ohApi.ts::transformAnnotation. Positions are UTF-16 protocol offsets,
 // matching every other public position-bearing API response.
 func (s *Session) handleGetAnnotationTransformInfos(ctx context.Context, params *SelectedFilesEmitParams) ([]*AnnotationTransformInfoResponse, error) {
-	setup, err := s.setupChecker(ctx, params.Snapshot, params.Project)
+	sd, program, err := s.setupProgram(params.Snapshot, params.Project)
 	if err != nil {
 		return nil, err
 	}
-	defer setup.done()
 	result := make([]*AnnotationTransformInfoResponse, 0, len(params.Files))
 	for _, file := range params.Files {
-		sourceFile := setup.program.GetSourceFile(file.ToFileName())
+		sourceFile := program.GetSourceFile(file.ToFileName())
 		if sourceFile == nil {
 			continue
 		}
+		fileChecker, done := program.GetTypeCheckerForFileExclusive(ctx, sourceFile)
+		setup := checkerSetup{sd: sd, program: program, checker: fileChecker, done: done, projectID: params.Project}
 		result = append(result, setup.annotationTransformInfoResponse(sourceFile))
+		done()
 	}
 	return result, nil
 }

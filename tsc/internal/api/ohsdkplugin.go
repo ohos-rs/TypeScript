@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/json"
 )
 
-const ohSdkPluginCallback = "ohSdkPlugin"
+const ohSdkPluginCallback = "ohSdkPluginBatch"
 
 var ohSdkPluginSessionCounter atomic.Uint64
 
@@ -68,14 +69,27 @@ type ohSdkPluginResponse struct {
 	CheckMessage string   `json:"checkMessage"`
 }
 
+type clientOhSdkPluginCall struct {
+	request  ohSdkPluginRequest
+	response chan clientOhSdkPluginCallResult
+}
+
+type clientOhSdkPluginCallResult struct {
+	response ohSdkPluginResponse
+	found    bool
+	err      error
+}
+
 // clientOhSdkPluginExecutor delegates the source-owned JavaScript plugin ABI
 // to the API client. TSGO never starts Node or evaluates JavaScript.
 type clientOhSdkPluginExecutor struct {
 	ctx       context.Context
 	conn      ipc.Conn
 	sessionID uint64
+	calls     chan clientOhSdkPluginCall
+	runOnce   sync.Once
 
-	mu             sync.Mutex
+	stateMu        sync.Mutex
 	nextSourceID   uint32
 	sources        map[string]clientOhSdkSource
 	projectConfigs []clientOhSdkProjectConfig
@@ -85,6 +99,7 @@ func newClientOhSdkPluginExecutor() *clientOhSdkPluginExecutor {
 	return &clientOhSdkPluginExecutor{
 		sessionID: ohSdkPluginSessionCounter.Add(1),
 		sources:   make(map[string]clientOhSdkSource),
+		calls:     make(chan clientOhSdkPluginCall),
 	}
 }
 
@@ -93,15 +108,10 @@ func newClientOhSdkPluginExecutor() *clientOhSdkPluginExecutor {
 func (e *clientOhSdkPluginExecutor) SetConnection(ctx context.Context, conn ipc.Conn) {
 	e.ctx = ctx
 	e.conn = conn
+	e.runOnce.Do(func() { go e.run() })
 }
 
 func (e *clientOhSdkPluginExecutor) call(plugin core.OhSdkCheckPlugin, operation string, args []any) (ohSdkPluginResponse, bool, error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.callLocked(plugin, operation, args)
-}
-
-func (e *clientOhSdkPluginExecutor) callLocked(plugin core.OhSdkCheckPlugin, operation string, args []any) (ohSdkPluginResponse, bool, error) {
 	if e.conn == nil {
 		return ohSdkPluginResponse{}, false, fmt.Errorf("OH SDK plugin callback invoked before API connection initialization")
 	}
@@ -110,18 +120,83 @@ func (e *clientOhSdkPluginExecutor) callLocked(plugin core.OhSdkCheckPlugin, ope
 		Path:      plugin.Path, FunctionName: plugin.FunctionName,
 		ClassName: plugin.FunctionName, Operation: operation, Args: args,
 	}
-	value, err := e.conn.Call(e.ctx, ohSdkPluginCallback, request)
+	call := clientOhSdkPluginCall{
+		request:  request,
+		response: make(chan clientOhSdkPluginCallResult, 1),
+	}
+	select {
+	case e.calls <- call:
+	case <-e.ctx.Done():
+		return ohSdkPluginResponse{}, false, e.ctx.Err()
+	}
+	select {
+	case result := <-call.response:
+		return result.response, result.found, result.err
+	case <-e.ctx.Done():
+		return ohSdkPluginResponse{}, false, e.ctx.Err()
+	}
+}
+
+func (e *clientOhSdkPluginExecutor) run() {
+	for {
+		select {
+		case first := <-e.calls:
+			batch := []clientOhSdkPluginCall{first}
+			// Checker partitions tend to reach the SDK hook together. Yield once
+			// so all currently runnable calls share one transport frame without
+			// adding a timer to the type-checking critical path.
+			runtime.Gosched()
+		collect:
+			for {
+				select {
+				case call := <-e.calls:
+					batch = append(batch, call)
+				default:
+					break collect
+				}
+			}
+			e.executeBatch(batch)
+		case <-e.ctx.Done():
+			return
+		}
+	}
+}
+
+func (e *clientOhSdkPluginExecutor) executeBatch(batch []clientOhSdkPluginCall) {
+	requests := make([]ohSdkPluginRequest, len(batch))
+	for i, call := range batch {
+		requests[i] = call.request
+	}
+	value, err := e.conn.Call(e.ctx, ohSdkPluginCallback, requests)
 	if err != nil {
-		return ohSdkPluginResponse{}, false, err
+		for _, call := range batch {
+			call.response <- clientOhSdkPluginCallResult{err: err}
+		}
+		return
 	}
-	var response ohSdkPluginResponse
-	if err := json.Unmarshal(value, &response); err != nil {
-		return ohSdkPluginResponse{}, false, fmt.Errorf("invalid OH SDK plugin response: %w", err)
+	var responses []ohSdkPluginResponse
+	if err := json.Unmarshal(value, &responses); err != nil || len(responses) != len(batch) {
+		if err == nil {
+			err = fmt.Errorf("received %d responses for %d requests", len(responses), len(batch))
+		}
+		err = fmt.Errorf("invalid OH SDK plugin batch response: %w", err)
+		for _, call := range batch {
+			call.response <- clientOhSdkPluginCallResult{err: err}
+		}
+		return
 	}
-	if response.Error != "" {
-		return response, response.Found, fmt.Errorf("SDK plugin %s#%s %s failed: %s", plugin.Path, plugin.FunctionName, response.Phase, response.Error)
+	for i, response := range responses {
+		var responseErr error
+		if response.Error != "" {
+			request := batch[i].request
+			responseErr = fmt.Errorf("SDK plugin %s#%s %s failed: %s", request.Path, request.FunctionName, response.Phase, response.Error)
+		}
+		batch[i].response <- clientOhSdkPluginCallResult{
+			response: response,
+			found:    response.Found,
+			err:      responseErr,
+		}
 	}
-	return response, response.Found, nil
 }
 
 func (e *clientOhSdkPluginExecutor) internSource(snapshot core.OhSdkPluginNodeSnapshot) clientOhSdkPluginNodeSnapshot {
@@ -193,18 +268,19 @@ func (e *clientOhSdkPluginExecutor) MatchBuildVersion(plugin core.OhSdkCheckPlug
 }
 
 func (e *clientOhSdkPluginExecutor) CheckSyscap(plugin core.OhSdkClassCheckPlugin, request core.OhSdkClassCheckRequest) (core.OhSdkPluginSyscapResult, bool, error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.stateMu.Lock()
 	projectConfigID, projectConfig := e.internProjectConfig(request.ProjectConfig)
+	node := e.internSource(request.Node)
+	declaration := e.internSource(request.Declaration)
+	e.stateMu.Unlock()
 	wireRequest := clientOhSdkClassCheckRequest{
-		Node:            e.internSource(request.Node),
-		Declaration:     e.internSource(request.Declaration),
+		Node:            node,
+		Declaration:     declaration,
 		ProjectConfigID: projectConfigID,
 		ProjectConfig:   projectConfig,
 	}
-	response, found, err := e.callLocked(core.OhSdkCheckPlugin{
-		Path: plugin.Path, FunctionName: plugin.ClassName,
-	}, "syscap", []any{wireRequest})
+	checkPlugin := core.OhSdkCheckPlugin{Path: plugin.Path, FunctionName: plugin.ClassName}
+	response, found, err := e.call(checkPlugin, "syscap", []any{wireRequest})
 	if err != nil && response.Phase == "load" {
 		return core.OhSdkPluginSyscapResult{}, false, nil
 	}

@@ -243,42 +243,73 @@ func (c *Checker) ohNeedsArkUIFindModuleWarning(useFile string, declarationFile 
 }
 
 func (c *Checker) isOHProjectFile(fileName string) bool {
+	// ets_checker.ts fixes the project roots for the Program lifetime and a
+	// SourceFile's fileName is immutable. Cache only this pure classification;
+	// plugin callbacks still execute for every source-owned check.
+	if projectFile, ok := c.ohProjectFileCache[fileName]; ok {
+		return projectFile
+	}
 	root := c.compilerOptions.OhProjectRootPath
 	if root == "" {
 		root = c.compilerOptions.OhProjectPath
 	}
-	return root != "" && strings.HasPrefix(tspath.NormalizePath(fileName), tspath.NormalizePath(root))
+	projectFile := root != "" && strings.HasPrefix(tspath.NormalizePath(fileName), tspath.NormalizePath(root))
+	if c.ohProjectFileCache == nil {
+		c.ohProjectFileCache = make(map[string]bool)
+	}
+	c.ohProjectFileCache[fileName] = projectFile
+	return projectFile
 }
 
 func (c *Checker) isOHSDKDeclarationFile(fileName string) bool {
-	normalized := tspath.NormalizePath(fileName)
-	if slices.ContainsFunc(c.compilerOptions.OhAllModulePaths, func(path string) bool {
-		return tspath.NormalizePath(path) == normalized
-	}) {
-		return true
+	// The SDK/module inventories are compiler options and therefore immutable
+	// for this Checker. Avoid normalizing every configured root for every
+	// identifier use without caching any diagnostic or plugin result.
+	if declarationFile, ok := c.ohSDKDeclarationFileCache[fileName]; ok {
+		return declarationFile
 	}
-	for _, config := range c.compilerOptions.OhSdkConfigs {
-		for _, root := range config.ApiPaths {
-			if root != "" && strings.HasPrefix(normalized, tspath.NormalizePath(root)+"/") {
-				return true
+	normalized := tspath.NormalizePath(fileName)
+	declarationFile := slices.ContainsFunc(c.compilerOptions.OhAllModulePaths, func(path string) bool {
+		return tspath.NormalizePath(path) == normalized
+	})
+	if !declarationFile {
+		for _, config := range c.compilerOptions.OhSdkConfigs {
+			for _, root := range config.ApiPaths {
+				if root != "" && strings.HasPrefix(normalized, tspath.NormalizePath(root)+"/") {
+					declarationFile = true
+					break
+				}
+			}
+			if declarationFile {
+				break
 			}
 		}
 	}
-	for _, root := range c.compilerOptions.OhExternalApiPaths {
-		if root != "" && strings.HasPrefix(normalized, tspath.NormalizePath(root)+"/") {
-			return true
+	if !declarationFile {
+		for _, root := range c.compilerOptions.OhExternalApiPaths {
+			if root != "" && strings.HasPrefix(normalized, tspath.NormalizePath(root)+"/") {
+				declarationFile = true
+				break
+			}
 		}
 	}
-	for _, root := range c.compilerOptions.OhArkUIDeclarationDirs {
-		if root != "" && strings.HasPrefix(normalized, tspath.NormalizePath(root)+"/") {
-			return true
+	if !declarationFile {
+		for _, root := range c.compilerOptions.OhArkUIDeclarationDirs {
+			if root != "" && strings.HasPrefix(normalized, tspath.NormalizePath(root)+"/") {
+				declarationFile = true
+				break
+			}
 		}
 	}
-	if c.compilerOptions.EtsLoaderPath != "" {
+	if !declarationFile && c.compilerOptions.EtsLoaderPath != "" {
 		declarations := tspath.NormalizePath(tspath.ResolvePath(c.compilerOptions.EtsLoaderPath, "declarations"))
-		return strings.HasPrefix(normalized, declarations+"/")
+		declarationFile = strings.HasPrefix(normalized, declarations+"/")
 	}
-	return false
+	if c.ohSDKDeclarationFileCache == nil {
+		c.ohSDKDeclarationFileCache = make(map[string]bool)
+	}
+	c.ohSDKDeclarationFileCache[fileName] = declarationFile
+	return declarationFile
 }
 
 func (c *Checker) ohSDKNodeNeedsCheck(useFile string, declarationFile string, projectAvailable bool, sdk bool) bool {

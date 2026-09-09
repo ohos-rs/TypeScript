@@ -591,6 +591,8 @@ type Checker struct {
 	throws                                      *throwsChecker
 	ohAvailableNodeChecks                       map[string]struct{}
 	ohSDKUseFacts                               map[string]map[string]OHSDKUseFact
+	ohProjectFileCache                          map[string]bool
+	ohSDKDeclarationFileCache                   map[string]bool
 	files                                       []*ast.SourceFile
 	fileIndexMap                                map[*ast.SourceFile]int
 	compareSymbols                              func(*ast.Symbol, *ast.Symbol) int

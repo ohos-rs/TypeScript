@@ -613,12 +613,7 @@ func (setup checkerSetup) resolveLocation(handle NodeHandle, file *DocumentIdent
 // setupChecker resolves snapshot, program, and type checker for a project.
 // Callers must defer setup.done() to release the checker.
 func (s *Session) setupChecker(ctx context.Context, snapshot SnapshotID, projectHandle ProjectID) (checkerSetup, error) {
-	sd, err := s.getSnapshotData(snapshot)
-	if err != nil {
-		return checkerSetup{}, err
-	}
-
-	program, err := sd.getProgram(projectHandle)
+	sd, program, err := s.setupProgram(snapshot, projectHandle)
 	if err != nil {
 		return checkerSetup{}, err
 	}
@@ -631,6 +626,22 @@ func (s *Session) setupChecker(ctx context.Context, snapshot SnapshotID, project
 		done:      done,
 		projectID: projectHandle,
 	}, nil
+}
+
+// setupProgram resolves a stable project without selecting a checker. Batched
+// file operations use this path so each source can query the checker assigned
+// by Program's parallel checker pool instead of forcing all files through
+// checker zero.
+func (s *Session) setupProgram(snapshot SnapshotID, projectHandle ProjectID) (*snapshotData, *compiler.Program, error) {
+	sd, err := s.getSnapshotData(snapshot)
+	if err != nil {
+		return nil, nil, err
+	}
+	program, err := sd.getProgram(projectHandle)
+	if err != nil {
+		return nil, nil, err
+	}
+	return sd, program, nil
 }
 
 // setupLanguageService creates a LanguageService for the given snapshot/project.
@@ -885,7 +896,7 @@ func (s *Session) HandleRequest(ctx context.Context, method string, params json.
 	case string(MethodGetAnnotationTransformInfos):
 		return s.handleGetAnnotationTransformInfos(ctx, parsed.(*SelectedFilesEmitParams))
 	case string(MethodGetArkTSTransformTypeFacts):
-		return s.handleGetArkTSTransformTypeFacts(ctx, parsed.(*SelectedFilesEmitParams))
+		return s.handleGetArkTSTransformTypeFacts(ctx, parsed.(*ArkTSTransformTypeFactsParams))
 	case string(MethodGetSignatureFromDeclaration):
 		return s.handleGetSignatureFromDeclaration(ctx, parsed.(*CheckerNodeParams))
 	case string(MethodGetExportSpecifierLocalTarget):

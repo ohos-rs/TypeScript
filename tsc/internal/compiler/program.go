@@ -123,9 +123,8 @@ type Program struct {
 	packagesMapOnce sync.Once
 	packagesMap     map[string]bool
 
-	arkTSLinterCheckerOnce sync.Once
-	arkTSLinterChecker     *checker.Checker
-	arkTSLinterCheckerMu   *sync.Mutex
+	arkTSLinterCheckerPoolOnce sync.Once
+	arkTSLinterCheckerPool     *checkerPool
 }
 
 // FileExists implements checker.Program.
@@ -586,16 +585,15 @@ func (p *Program) GetTypeChecker(ctx context.Context) (*checker.Checker, func())
 	return p.checkerPool.GetChecker(ctx, nil)
 }
 
-// GetArkTSLinterChecker returns the source-defined second TypeChecker used by
-// the ArkTS 1.1 linter. Its semantic caches are isolated from the normal
-// checker while the Program, SourceFiles, resolver graph, and binder symbols
-// remain shared.
-func (p *Program) GetArkTSLinterChecker() (*checker.Checker, func()) {
-	p.arkTSLinterCheckerOnce.Do(func() {
-		p.arkTSLinterChecker, p.arkTSLinterCheckerMu = checker.NewArkTSLinterChecker(p, nil)
+// getArkTSLinterCheckerPool returns the source-defined second TypeChecker
+// domain used by the ArkTS 1.1 linter. Its semantic caches are isolated from
+// the normal checker while Program, SourceFiles, resolver graph, and binder
+// symbols remain shared.
+func (p *Program) getArkTSLinterCheckerPool() *checkerPool {
+	p.arkTSLinterCheckerPoolOnce.Do(func() {
+		p.arkTSLinterCheckerPool = newArkTSLinterCheckerPool(p)
 	})
-	p.arkTSLinterCheckerMu.Lock()
-	return p.arkTSLinterChecker, p.arkTSLinterCheckerMu.Unlock
+	return p.arkTSLinterCheckerPool
 }
 
 func (p *Program) ForEachCheckerParallel(cb func(idx int, c *checker.Checker)) {
@@ -822,58 +820,72 @@ func (p *Program) GetArkTSLinterDiagnostics(ctx context.Context, sourceFile *ast
 	if sourceFile != nil {
 		files = []*ast.SourceFile{sourceFile}
 	}
-	result := make([][]*ast.Diagnostic, len(files))
-	for index, file := range files {
-		if file.ScriptKind != core.ScriptKindETS && file.ScriptKind != core.ScriptKindTS {
-			continue
-		}
-		if p.Options().SkipOhModulesLint == core.TSTrue && strings.Contains(tspath.NormalizePath(file.FileName()), "/oh_modules/") {
-			continue
-		}
-		if file.ScriptKind == core.ScriptKindTS {
-			fileName := tspath.NormalizePath(file.FileName())
-			isKit := strings.HasPrefix(tspath.GetBaseFileName(fileName), "@kit.")
-			isInOHModules := strings.Contains(fileName, "/oh_modules/")
-			isInSDK := false
-			if p.Options().EtsLoaderPath != "" {
-				sdkRoot := tspath.NormalizePath(tspath.ResolvePath(p.Options().EtsLoaderPath, "../.."))
-				isInSDK = strings.HasPrefix(fileName, sdkRoot)
-			}
-			if isKit || isInOHModules || p.Options().TsImportSendableEnable != core.TSTrue && !isInSDK {
-				continue
-			}
-		}
 
-		strictChecker, strictDone := p.GetArkTSLinterChecker()
+	// ArkTSLinter_1_1/TSDiagnostics.ts::doAllGetDiagnostics computes the
+	// ordinary program before the strict program. Keep that phase boundary: it
+	// lets Corsa's normal checker pool process file groups in parallel instead
+	// of serializing both checker populations inside the linter loop.
+	normalDiagnostics := make(map[*ast.SourceFile][]*ast.Diagnostic)
+	if !p.Options().StrictCheckerOnly.IsTrue() {
+		etsFiles := core.Filter(files, func(file *ast.SourceFile) bool {
+			return file.ScriptKind == core.ScriptKindETS && p.shouldRunArkTSLinter(file)
+		})
+		groups := p.collectCheckerDiagnosticsFromFiles(ctx, etsFiles, p.getSemanticDiagnosticsWithChecker)
+		for index, file := range etsFiles {
+			normalDiagnostics[file] = groups[index]
+		}
+	}
+
+	result := make([][]*ast.Diagnostic, len(files))
+	p.getArkTSLinterCheckerPool().forEachCheckerGroupDo(ctx, files, p.SingleThreaded(), func(strictChecker *checker.Checker, index int, file *ast.SourceFile) {
+		if !p.shouldRunArkTSLinter(file) {
+			return
+		}
 		if file.ScriptKind == core.ScriptKindTS {
 			// ArkTSLinter_1_1/LinterRunner.ts runs InteropTypescriptLinter with
 			// the linter checker, but deliberately publishes only its own rule
 			// diagnostics for TypeScript source files.
 			result[index] = strictChecker.GetArkTSLinterDiagnostics(file, nil)
-			strictDone()
-			continue
+			return
 		}
 
 		strictDiagnostics := p.getSemanticDiagnosticsWithChecker(ctx, strictChecker, file)
 		strictOnly := strictDiagnostics
 		if !p.Options().StrictCheckerOnly.IsTrue() {
-			normalChecker, normalDone := p.GetTypeCheckerForFileExclusive(ctx, file)
-			normalDiagnostics := p.getSemanticDiagnosticsWithChecker(ctx, normalChecker, file)
-			normalDone()
-			strictOnly = arkTSStrictOnlyDiagnostics(strictDiagnostics, normalDiagnostics)
+			strictOnly = arkTSStrictOnlyDiagnostics(strictDiagnostics, normalDiagnostics[file])
 		} else {
 			strictOnly = core.Filter(strictOnly, func(diagnostic *ast.Diagnostic) bool {
 				return diagnostic.Pos() != 0 || diagnostic.Len() != 0
 			})
 		}
 		result[index] = strictChecker.GetArkTSLinterDiagnostics(file, strictOnly)
-		strictDone()
-	}
+	})
 	// ArkTSLinter_1_1/LinterRunner.ts preserves checker/linter production order.
 	// In particular, a parent-node diagnostic may intentionally precede a child
 	// diagnostic at an earlier source offset; sorting here changes the public
 	// result and the upstream fixture contract.
 	return slices.Concat(result...)
+}
+
+func (p *Program) shouldRunArkTSLinter(file *ast.SourceFile) bool {
+	if file.ScriptKind != core.ScriptKindETS && file.ScriptKind != core.ScriptKindTS {
+		return false
+	}
+	fileName := tspath.NormalizePath(file.FileName())
+	if p.Options().SkipOhModulesLint == core.TSTrue && strings.Contains(fileName, "/oh_modules/") {
+		return false
+	}
+	if file.ScriptKind != core.ScriptKindTS {
+		return true
+	}
+	isKit := strings.HasPrefix(tspath.GetBaseFileName(fileName), "@kit.")
+	isInOHModules := strings.Contains(fileName, "/oh_modules/")
+	isInSDK := false
+	if p.Options().EtsLoaderPath != "" {
+		sdkRoot := tspath.NormalizePath(tspath.ResolvePath(p.Options().EtsLoaderPath, "../.."))
+		isInSDK = strings.HasPrefix(fileName, sdkRoot)
+	}
+	return !isKit && !isInOHModules && (p.Options().TsImportSendableEnable == core.TSTrue || isInSDK)
 }
 
 type arkTSDiagnosticKey struct {

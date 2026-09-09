@@ -26,12 +26,15 @@ type CheckerPool interface {
 type checkerPool struct {
 	program *Program
 	tracing *tracing.Tracing
+	factory checkerFactory
 
 	createCheckersOnce sync.Once
 	checkers           []*checker.Checker
 	locks              []*sync.Mutex
 	fileAssociations   map[*ast.SourceFile]*checker.Checker
 }
+
+type checkerFactory func(program checker.Program, tracer *checker.Tracer) (*checker.Checker, *sync.Mutex)
 
 var _ CheckerPool = (*checkerPool)(nil)
 
@@ -303,6 +306,19 @@ func newCheckerPool(program *Program) *checkerPool {
 }
 
 func newCheckerPoolWithTracing(program *Program, tr *tracing.Tracing) *checkerPool {
+	return newCheckerPoolWithFactory(program, tr, checker.NewChecker)
+}
+
+// newArkTSLinterCheckerPool creates the source-defined strict checker over the
+// same Program. Corsa's checker partitioning evaluates independent file groups
+// in parallel and the caller merges their diagnostics in source order. SDK
+// plugin execution remains synchronized by its shared executor; loading a
+// plugin must not disable the compiler's file-level parallelism.
+func newArkTSLinterCheckerPool(program *Program) *checkerPool {
+	return newCheckerPoolWithFactory(program, nil, checker.NewArkTSLinterChecker)
+}
+
+func newCheckerPoolWithFactory(program *Program, tr *tracing.Tracing, factory checkerFactory) *checkerPool {
 	checkerCount := 4
 	if program.SingleThreaded() {
 		checkerCount = 1
@@ -317,6 +333,7 @@ func newCheckerPoolWithTracing(program *Program, tr *tracing.Tracing) *checkerPo
 		checkers: make([]*checker.Checker, checkerCount),
 		locks:    make([]*sync.Mutex, checkerCount),
 		tracing:  tr,
+		factory:  factory,
 	}
 
 	return pool
@@ -370,7 +387,7 @@ func (p *checkerPool) createCheckers() {
 				if p.tracing != nil {
 					tracer = checker.NewTracer(p.tracing, i)
 				}
-				p.checkers[i], p.locks[i] = checker.NewChecker(p.program, tracer)
+				p.checkers[i], p.locks[i] = p.factory(p.program, tracer)
 			})
 		}
 

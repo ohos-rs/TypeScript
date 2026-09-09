@@ -19,29 +19,29 @@ func (c *sdkPluginCallbackConn) Call(_ context.Context, method string, params an
 	if method != ohSdkPluginCallback {
 		return nil, fmt.Errorf("unexpected callback %q", method)
 	}
-	request, ok := params.(ohSdkPluginRequest)
+	requests, ok := params.([]ohSdkPluginRequest)
 	if !ok {
 		return nil, fmt.Errorf("unexpected request type %T", params)
 	}
-	c.requests = append(c.requests, request)
-	var response ohSdkPluginResponse
-	switch request.Operation {
-	case "prepareClass":
-		response.Found = request.ClassName == "SyscapChecker"
-	case "value":
-		response = ohSdkPluginResponse{Found: true, Result: true, Message: "value"}
-	case "format":
-		response = ohSdkPluginResponse{Found: true, Result: true, Message: "format"}
-	case "distribution":
-		response = ohSdkPluginResponse{Found: true, Valid: true, Version: "17", Message: "distribution"}
-	case "regex":
-		response = ohSdkPluginResponse{Found: true, Matched: true, Groups: []string{"5.0.5(17)", "5", "0", "5", "17"}}
-	case "syscap":
-		response = ohSdkPluginResponse{Found: true, CheckResult: true, CheckMessage: "syscap"}
-	default:
-		response = ohSdkPluginResponse{Found: false}
+	c.requests = append(c.requests, requests...)
+	responses := make([]ohSdkPluginResponse, len(requests))
+	for index, request := range requests {
+		switch request.Operation {
+		case "prepareClass":
+			responses[index].Found = request.ClassName == "SyscapChecker"
+		case "value":
+			responses[index] = ohSdkPluginResponse{Found: true, Result: true, Message: "value"}
+		case "format":
+			responses[index] = ohSdkPluginResponse{Found: true, Result: true, Message: "format"}
+		case "distribution":
+			responses[index] = ohSdkPluginResponse{Found: true, Valid: true, Version: "17", Message: "distribution"}
+		case "regex":
+			responses[index] = ohSdkPluginResponse{Found: true, Matched: true, Groups: []string{"5.0.5(17)", "5", "0", "5", "17"}}
+		case "syscap":
+			responses[index] = ohSdkPluginResponse{Found: true, CheckResult: true, CheckMessage: "syscap"}
+		}
 	}
-	return json.Marshal(response)
+	return json.Marshal(responses)
 }
 
 func (*sdkPluginCallbackConn) Notify(context.Context, string, any) error { return nil }
@@ -94,9 +94,15 @@ func TestClientOhSdkPluginExecutorPreservesTypedCallbackContracts(t *testing.T) 
 	if _, _, err := executor.CheckSyscap(classPlugin, classRequest); err != nil {
 		t.Fatalf("second syscap callback failed: %v", err)
 	}
+	changedClassRequest := classRequest
+	changedClassRequest.Node.Pos = 1
+	changedClassRequest.Node.Text = "se"
+	if _, _, err := executor.CheckSyscap(classPlugin, changedClassRequest); err != nil {
+		t.Fatalf("changed syscap callback failed: %v", err)
+	}
 
-	if len(conn.requests) != 7 {
-		t.Fatalf("received %d callbacks, want 7", len(conn.requests))
+	if len(conn.requests) != 8 {
+		t.Fatalf("received %d callbacks, want 8", len(conn.requests))
 	}
 	if conn.requests[0].SessionID == 0 || conn.requests[0].Path != plugin.Path || conn.requests[0].Operation != "value" {
 		t.Fatalf("first callback = %#v", conn.requests[0])
@@ -114,6 +120,41 @@ func TestClientOhSdkPluginExecutorPreservesTypedCallbackContracts(t *testing.T) 
 	}
 	if first.Node.SourceID != second.Node.SourceID || first.ProjectConfigID != second.ProjectConfigID {
 		t.Fatalf("syscap session ids changed: first %#v, second %#v", first, second)
+	}
+}
+
+func TestClientOhSdkPluginExecutorKeepsEveryRequestInAnOrderedBatch(t *testing.T) {
+	conn := &sdkPluginCallbackConn{}
+	executor := newClientOhSdkPluginExecutor()
+	executor.ctx = context.Background()
+	executor.conn = conn
+	responses := []chan clientOhSdkPluginCallResult{
+		make(chan clientOhSdkPluginCallResult, 1),
+		make(chan clientOhSdkPluginCallResult, 1),
+	}
+	executor.executeBatch([]clientOhSdkPluginCall{
+		{
+			request:  ohSdkPluginRequest{Operation: "value", FunctionName: "value"},
+			response: responses[0],
+		},
+		{
+			request:  ohSdkPluginRequest{Operation: "regex", FunctionName: "regex"},
+			response: responses[1],
+		},
+	})
+
+	first := <-responses[0]
+	second := <-responses[1]
+	if first.err != nil || !first.response.Result || first.response.Message != "value" {
+		t.Fatalf("first response = %#v", first)
+	}
+	if second.err != nil || !second.response.Matched || len(second.response.Groups) != 5 {
+		t.Fatalf("second response = %#v", second)
+	}
+	if len(conn.requests) != 2 ||
+		conn.requests[0].Operation != "value" ||
+		conn.requests[1].Operation != "regex" {
+		t.Fatalf("batch requests = %#v", conn.requests)
 	}
 }
 
@@ -146,7 +187,7 @@ type sdkPluginErrorConn struct{}
 func (sdkPluginErrorConn) Run(context.Context) error                 { return nil }
 func (sdkPluginErrorConn) Notify(context.Context, string, any) error { return nil }
 func (sdkPluginErrorConn) Call(context.Context, string, any) (json.Value, error) {
-	return json.Marshal(ohSdkPluginResponse{Phase: "load", Error: "module not found"})
+	return json.Marshal([]ohSdkPluginResponse{{Phase: "load", Error: "module not found"}})
 }
 
 type sdkPluginInvokeErrorConn struct{}
@@ -154,5 +195,5 @@ type sdkPluginInvokeErrorConn struct{}
 func (sdkPluginInvokeErrorConn) Run(context.Context) error                 { return nil }
 func (sdkPluginInvokeErrorConn) Notify(context.Context, string, any) error { return nil }
 func (sdkPluginInvokeErrorConn) Call(context.Context, string, any) (json.Value, error) {
-	return json.Marshal(ohSdkPluginResponse{Found: true, Phase: "invoke", Error: "callback threw"})
+	return json.Marshal([]ohSdkPluginResponse{{Found: true, Phase: "invoke", Error: "callback threw"}})
 }

@@ -537,7 +537,7 @@ var unmarshalers = map[Method]func([]byte) (any, error){
 	MethodGetConstantValue:                  unmarshallerFor[CheckerNodeParams],
 	MethodGetAnnotationInfo:                 unmarshallerFor[CheckerNodeParams],
 	MethodGetAnnotationTransformInfos:       unmarshallerFor[SelectedFilesEmitParams],
-	MethodGetArkTSTransformTypeFacts:        unmarshallerFor[SelectedFilesEmitParams],
+	MethodGetArkTSTransformTypeFacts:        unmarshallerFor[ArkTSTransformTypeFactsParams],
 	MethodGetSignatureFromDeclaration:       unmarshallerFor[CheckerNodeParams],
 	MethodGetExportSpecifierLocalTarget:     unmarshallerFor[CheckerNodeParams],
 	MethodGetAliasedSymbol:                  unmarshallerFor[CheckerSymbolParams],

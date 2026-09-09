@@ -17,6 +17,29 @@ type ArkTSTransformTypeFactsResponse struct {
 	SDKApiUses      []*ArkTSSDKApiUseResponse                `json:"sdkApiUses"`
 }
 
+// ArkTSTransformTypeFactsParams contains syntax-selected type queries. The
+// native OXC transform owns node discovery; this service only resolves types.
+type ArkTSTransformTypeFactsParams struct {
+	Snapshot       SnapshotID                          `json:"snapshot"`
+	Project        ProjectID                           `json:"project"`
+	Queries        []*ArkTSTransformTypeFactsFileQuery `json:"queries"`
+	SDKApiUseFiles []DocumentIdentifier                `json:"sdkApiUseFiles"`
+}
+
+type ArkTSTransformTypeFactsFileQuery struct {
+	File            DocumentIdentifier     `json:"file"`
+	Properties      []*ArkTSTypeQueryRange `json:"properties"`
+	BuilderAccesses []*ArkTSTypeQueryRange `json:"builderAccesses"`
+	MemberAccesses  []*ArkTSTypeQueryRange `json:"memberAccesses"`
+}
+
+// ArkTSTypeQueryRange positions are UTF-16 offsets, matching the public API
+// protocol and the spans returned to the Rust consumer.
+type ArkTSTypeQueryRange struct {
+	Pos int `json:"pos"`
+	End int `json:"end"`
+}
+
 type ArkTSSDKApiUseResponse struct {
 	ApiModule string `json:"apiModule"`
 	Function  string `json:"function"`
@@ -90,74 +113,119 @@ func newResolvedTypeIdentityResponse(typ *checker.Type) *ResolvedTypeIdentityRes
 // handleGetArkTSTransformTypeFacts batches the type queries used by
 // process_component_member.ts::isSimpleType and
 // process_component_build.ts::{isWrappedBuilder,isMutableBuilder,isRegularAttrNode}.
-func (s *Session) handleGetArkTSTransformTypeFacts(ctx context.Context, params *SelectedFilesEmitParams) ([]*ArkTSTransformTypeFactsResponse, error) {
-	setup, err := s.setupChecker(ctx, params.Snapshot, params.Project)
+func (s *Session) handleGetArkTSTransformTypeFacts(ctx context.Context, params *ArkTSTransformTypeFactsParams) ([]*ArkTSTransformTypeFactsResponse, error) {
+	_, program, err := s.setupProgram(params.Snapshot, params.Project)
 	if err != nil {
 		return nil, err
 	}
-	defer setup.done()
-	result := make([]*ArkTSTransformTypeFactsResponse, 0, len(params.Files))
-	for _, file := range params.Files {
-		sourceFile := setup.program.GetSourceFile(file.ToFileName())
+	result := make([]*ArkTSTransformTypeFactsResponse, 0, len(params.Queries))
+	responses := make(map[string]*ArkTSTransformTypeFactsResponse, len(params.Queries))
+	for _, query := range params.Queries {
+		sourceFile := program.GetSourceFile(query.File.ToFileName())
 		if sourceFile == nil {
 			continue
 		}
-		result = append(result, setup.arkTSTransformTypeFactsResponse(ctx, sourceFile))
+		fileChecker, done := program.GetTypeCheckerForFileExclusive(ctx, sourceFile)
+		response := arkTSTransformTypeFactsResponse(fileChecker, sourceFile, query)
+		done()
+		result = append(result, response)
+		responses[sourceFile.FileName()] = response
+	}
+	// SDK API use facts belong to the checker instance. They cannot be reused
+	// from the preceding diagnostics lease, so cross-platform builds check only
+	// their explicitly selected implementation files here. Normal builds pass
+	// no SDKApiUseFiles and perform no duplicate diagnostic work.
+	for _, file := range params.SDKApiUseFiles {
+		sourceFile := program.GetSourceFile(file.ToFileName())
+		if sourceFile == nil {
+			continue
+		}
+		fileChecker, done := program.GetTypeCheckerForFileExclusive(ctx, sourceFile)
+		fileChecker.GetDiagnostics(ctx, sourceFile)
+		uses := fileChecker.OHSDKUseFacts(sourceFile.FileName())
+		done()
+		if len(uses) == 0 {
+			continue
+		}
+		response := responses[sourceFile.FileName()]
+		if response == nil {
+			response = newArkTSTransformTypeFactsResponse(sourceFile.FileName())
+			responses[sourceFile.FileName()] = response
+			result = append(result, response)
+		}
+		for _, fact := range uses {
+			response.SDKApiUses = append(response.SDKApiUses, &ArkTSSDKApiUseResponse{
+				ApiModule: fact.ApiModule,
+				Function:  fact.Function,
+			})
+		}
 	}
 	return result, nil
 }
 
-func (setup checkerSetup) arkTSTransformTypeFactsResponse(ctx context.Context, sourceFile *ast.SourceFile) *ArkTSTransformTypeFactsResponse {
-	// checker.ts invokes checkCrossplatformValue while checking resolved SDK
-	// declarations. Run that same checker path before snapshotting the callback
-	// facts; AST traversal alone cannot reproduce overload and return-type use.
-	setup.checker.GetDiagnostics(ctx, sourceFile)
-	positions := sourceFile.GetPositionMap()
-	response := &ArkTSTransformTypeFactsResponse{
-		FileName:        sourceFile.FileName(),
+func newArkTSTransformTypeFactsResponse(fileName string) *ArkTSTransformTypeFactsResponse {
+	return &ArkTSTransformTypeFactsResponse{
+		FileName:        fileName,
 		Properties:      make([]*ArkTSPropertyTypeFactsResponse, 0),
 		BuilderAccesses: make([]*ArkTSBuilderReceiverTypeFactsResponse, 0),
 		MemberAccesses:  make([]*ArkTSExpressionTypeFactsResponse, 0),
 		SDKApiUses:      make([]*ArkTSSDKApiUseResponse, 0),
 	}
-	for _, fact := range setup.checker.OHSDKUseFacts(sourceFile.FileName()) {
-		response.SDKApiUses = append(response.SDKApiUses, &ArkTSSDKApiUseResponse{
-			ApiModule: fact.ApiModule,
-			Function:  fact.Function,
-		})
+}
+
+func arkTSTransformTypeFactsResponse(typeChecker *checker.Checker, sourceFile *ast.SourceFile, query *ArkTSTransformTypeFactsFileQuery) *ArkTSTransformTypeFactsResponse {
+	positions := sourceFile.GetPositionMap()
+	response := newArkTSTransformTypeFactsResponse(sourceFile.FileName())
+	propertyEnds := make(map[int]struct{}, len(query.Properties))
+	for _, item := range query.Properties {
+		propertyEnds[positions.UTF16ToUTF8(item.End)] = struct{}{}
+	}
+	builderAccessEnds := make(map[int]struct{}, len(query.BuilderAccesses))
+	for _, item := range query.BuilderAccesses {
+		builderAccessEnds[positions.UTF16ToUTF8(item.End)] = struct{}{}
+	}
+	memberAccessEnds := make(map[int]struct{}, len(query.MemberAccesses))
+	for _, item := range query.MemberAccesses {
+		memberAccessEnds[positions.UTF16ToUTF8(item.End)] = struct{}{}
 	}
 	var visit func(*ast.Node) bool
 	visit = func(node *ast.Node) bool {
 		if ast.IsPropertyDeclaration(node) && (node.Parent == nil || !ast.IsAnnotationDeclaration(node.Parent)) {
+			if _, selected := propertyEnds[node.Name().End()]; !selected {
+				node.ForEachChild(visit)
+				return false
+			}
 			property := &ArkTSPropertyTypeFactsResponse{
 				NamePos: positions.UTF8ToUTF16(node.Name().Pos()),
 				NameEnd: positions.UTF8ToUTF16(node.Name().End()),
 			}
 			if typeNode := node.Type(); typeNode != nil {
-				property.Type = newResolvedTypeIdentityResponse(setup.checker.GetTypeFromTypeNode(typeNode))
+				property.Type = newResolvedTypeIdentityResponse(typeChecker.GetTypeFromTypeNode(typeNode))
 			}
 			response.Properties = append(response.Properties, property)
 		}
 		if ast.IsPropertyAccessExpression(node) {
-			if node.Name().Text() == "builder" {
+			if _, selected := builderAccessEnds[node.End()]; selected && node.Name().Text() == "builder" {
 				response.BuilderAccesses = append(response.BuilderAccesses, &ArkTSBuilderReceiverTypeFactsResponse{
 					Pos: positions.UTF8ToUTF16(node.Pos()), End: positions.UTF8ToUTF16(node.End()),
-					ReceiverType: newResolvedTypeIdentityResponse(setup.checker.GetTypeAtLocation(node.Expression())),
+					ReceiverType: newResolvedTypeIdentityResponse(typeChecker.GetTypeAtLocation(node.Expression())),
 				})
 			}
 			// ets2bundle's type-checker fallback in isRegularAttrNode is only
 			// reached for `Identifier.Member`, so do not grow the snapshot with
 			// unrelated chained and `this` accesses.
-			if ast.IsIdentifier(node.Expression()) {
+			if _, selected := memberAccessEnds[node.End()]; selected && ast.IsIdentifier(node.Expression()) {
 				response.MemberAccesses = append(response.MemberAccesses, &ArkTSExpressionTypeFactsResponse{
 					Pos: positions.UTF8ToUTF16(node.Pos()), End: positions.UTF8ToUTF16(node.End()),
-					Type: newResolvedTypeIdentityResponse(setup.checker.GetTypeAtLocation(node)),
+					Type: newResolvedTypeIdentityResponse(typeChecker.GetTypeAtLocation(node)),
 				})
 			}
 		}
 		node.ForEachChild(visit)
 		return false
 	}
-	sourceFile.AsNode().ForEachChild(visit)
+	if len(propertyEnds)+len(builderAccessEnds)+len(memberAccessEnds) != 0 {
+		sourceFile.AsNode().ForEachChild(visit)
+	}
 	return response
 }
