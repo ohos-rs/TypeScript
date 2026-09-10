@@ -2,6 +2,7 @@ package compiler_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -39,6 +40,37 @@ func TestArkTSLinterIsIndependentAndUsesStrictChecker(t *testing.T) {
 	}
 	if !slices.ContainsFunc(linter, func(diagnostic *ast.Diagnostic) bool { return diagnostic.Code() == 2322 }) {
 		t.Fatalf("missing strict-only assignment diagnostic: %v", linter)
+	}
+}
+
+func TestArkTSBuildDiagnosticsMatchesSourcePhaseOutputs(t *testing.T) {
+	t.Parallel()
+	files := map[string]string{
+		"/input.ets": "var value: string | undefined;\nconst copy: string = value;\nconst wrong: number = 'text';\n",
+	}
+	newProgram := func() *compiler.Program {
+		return newArkTSLinterProgram(bundled.WrapFS(vfstest.FromMap(files, true)), "/", []string{"/input.ets"})
+	}
+
+	combined := newProgram().GetArkTSBuildDiagnostics(t.Context())
+	separateProgram := newProgram()
+	wantLinter := separateProgram.GetArkTSLinterDiagnostics(t.Context(), nil)
+	wantSyntactic := separateProgram.GetSyntacticDiagnostics(t.Context(), nil)
+	wantSemantic := separateProgram.GetSemanticDiagnostics(t.Context(), nil)
+
+	diagnosticKeys := func(diagnostics []*ast.Diagnostic) []string {
+		return core.Map(diagnostics, func(diagnostic *ast.Diagnostic) string {
+			return fmt.Sprintf("%d:%d:%d", diagnostic.Code(), diagnostic.Pos(), diagnostic.Len())
+		})
+	}
+	if got, want := diagnosticKeys(combined.Linter), diagnosticKeys(wantLinter); !slices.Equal(got, want) {
+		t.Fatalf("combined linter diagnostics = %v, want %v", got, want)
+	}
+	if got, want := diagnosticKeys(combined.Syntactic), diagnosticKeys(wantSyntactic); !slices.Equal(got, want) {
+		t.Fatalf("combined syntactic diagnostics = %v, want %v", got, want)
+	}
+	if got, want := diagnosticKeys(combined.Semantic), diagnosticKeys(wantSemantic); !slices.Equal(got, want) {
+		t.Fatalf("combined semantic diagnostics = %v, want %v", got, want)
 	}
 }
 

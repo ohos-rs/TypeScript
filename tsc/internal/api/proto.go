@@ -196,6 +196,7 @@ const (
 	MethodGetBindDiagnostics              Method = "getBindDiagnostics"
 	MethodGetSemanticDiagnostics          Method = "getSemanticDiagnostics"
 	MethodGetArkTSLinterDiagnostics       Method = "getArkTSLinterDiagnostics"
+	MethodGetArkTSBuildDiagnostics        Method = "getArkTSBuildDiagnostics"
 	MethodGetSuggestionDiagnostics        Method = "getSuggestionDiagnostics"
 	MethodGetDeclarationDiagnostics       Method = "getDeclarationDiagnostics"
 	MethodGetProgramDiagnostics           Method = "getProgramDiagnostics"
@@ -578,6 +579,7 @@ var unmarshalers = map[Method]func([]byte) (any, error){
 	MethodGetBindDiagnostics:                unmarshallerFor[GetDiagnosticsParams],
 	MethodGetSemanticDiagnostics:            unmarshallerFor[GetDiagnosticsParams],
 	MethodGetArkTSLinterDiagnostics:         unmarshallerFor[GetDiagnosticsParams],
+	MethodGetArkTSBuildDiagnostics:          unmarshallerFor[GetProjectDiagnosticsParams],
 	MethodGetSuggestionDiagnostics:          unmarshallerFor[GetDiagnosticsParams],
 	MethodGetDeclarationDiagnostics:         unmarshallerFor[GetDiagnosticsParams],
 	MethodGetProgramDiagnostics:             unmarshallerFor[GetProjectDiagnosticsParams],
@@ -1528,6 +1530,15 @@ type GetDiagnosticsParams struct {
 type GetProjectDiagnosticsParams struct {
 	Snapshot SnapshotID `json:"snapshot"`
 	Project  ProjectID  `json:"project"`
+}
+
+// ArkTSBuildDiagnosticsResponse is the build-specific diagnostic batch used by
+// ets2bundle consumers. It keeps the linter and TypeScript channels separate
+// so callers retain their source-defined filtering and presentation rules.
+type ArkTSBuildDiagnosticsResponse struct {
+	LinterDiagnostics    []*DiagnosticResponse `json:"linterDiagnostics"`
+	SyntacticDiagnostics []*DiagnosticResponse `json:"syntacticDiagnostics"`
+	SemanticDiagnostics  []*DiagnosticResponse `json:"semanticDiagnostics"`
 }
 
 // DiagnosticResponse is the API response for a single diagnostic.

@@ -957,6 +957,8 @@ func (s *Session) HandleRequest(ctx context.Context, method string, params json.
 		return s.handleGetSemanticDiagnostics(ctx, parsed.(*GetDiagnosticsParams))
 	case string(MethodGetArkTSLinterDiagnostics):
 		return s.handleGetArkTSLinterDiagnostics(ctx, parsed.(*GetDiagnosticsParams))
+	case string(MethodGetArkTSBuildDiagnostics):
+		return s.handleGetArkTSBuildDiagnostics(ctx, parsed.(*GetProjectDiagnosticsParams))
 	case string(MethodGetSuggestionDiagnostics):
 		return s.handleGetSuggestionDiagnostics(ctx, parsed.(*GetDiagnosticsParams))
 	case string(MethodGetDeclarationDiagnostics):
@@ -4104,6 +4106,41 @@ func (s *Session) handleGetSemanticDiagnostics(ctx context.Context, params *GetD
 func (s *Session) handleGetArkTSLinterDiagnostics(ctx context.Context, params *GetDiagnosticsParams) ([]*DiagnosticResponse, error) {
 	ctx = core.WithCheckerLifetime(ctx, core.CheckerLifetimeDiagnostics)
 	return s.getDiagnostics(ctx, params, (*compiler.Program).GetArkTSLinterDiagnostics)
+}
+
+// handleGetArkTSBuildDiagnostics mirrors the one-BuilderProgram build path in
+// ArkTSLinter_1_1/TSDiagnostics.ts and ets_checker.ts::processBuildHap. The
+// normal semantic result is produced once and shared with strict-diagnostic
+// comparison instead of being recomputed by a second API request.
+func (s *Session) handleGetArkTSBuildDiagnostics(ctx context.Context, params *GetProjectDiagnosticsParams) (*ArkTSBuildDiagnosticsResponse, error) {
+	ctx = core.WithCheckerLifetime(ctx, core.CheckerLifetimeDiagnostics)
+	sd, err := s.getSnapshotData(params.Snapshot)
+	if err != nil {
+		return nil, err
+	}
+	program, err := sd.getProgram(params.Project)
+	if err != nil {
+		return nil, err
+	}
+	diagnostics := program.GetArkTSBuildDiagnostics(ctx)
+	response := &ArkTSBuildDiagnosticsResponse{
+		LinterDiagnostics:    NewDiagnosticResponses(diagnostics.Linter),
+		SyntacticDiagnostics: NewDiagnosticResponses(diagnostics.Syntactic),
+		SemanticDiagnostics:  NewDiagnosticResponses(diagnostics.Semantic),
+	}
+	// The protocol contract is three arrays, including for a clean program.
+	// Keep empty slices non-nil so JSON emits [] instead of null and clients do
+	// not need a second nullable representation for the same response shape.
+	if response.LinterDiagnostics == nil {
+		response.LinterDiagnostics = make([]*DiagnosticResponse, 0)
+	}
+	if response.SyntacticDiagnostics == nil {
+		response.SyntacticDiagnostics = make([]*DiagnosticResponse, 0)
+	}
+	if response.SemanticDiagnostics == nil {
+		response.SemanticDiagnostics = make([]*DiagnosticResponse, 0)
+	}
+	return response, nil
 }
 
 // @gen-proto-nullable

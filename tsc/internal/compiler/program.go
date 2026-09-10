@@ -718,9 +718,7 @@ func filterAndSortDiagnostics(diags []*ast.Diagnostic) []*ast.Diagnostic {
 func (p *Program) collectCheckerDiagnosticsFromFiles(ctx context.Context, sourceFiles []*ast.SourceFile, collect func(context.Context, *checker.Checker, *ast.SourceFile) []*ast.Diagnostic) [][]*ast.Diagnostic {
 	diagnostics := make([][]*ast.Diagnostic, len(sourceFiles))
 	if p.compilerCheckerPool != nil {
-		p.compilerCheckerPool.forEachCheckerGroupDo(ctx, sourceFiles, p.SingleThreaded(), func(c *checker.Checker, fileIndex int, file *ast.SourceFile) {
-			diagnostics[fileIndex] = collect(ctx, c, file)
-		})
+		p.collectCompilerCheckerDiagnosticsFromFiles(ctx, sourceFiles, p.compilerCheckerPool, diagnostics, collect)
 	} else {
 		wg := core.NewWorkGroup(p.SingleThreaded())
 		for i, file := range sourceFiles {
@@ -736,6 +734,18 @@ func (p *Program) collectCheckerDiagnosticsFromFiles(ctx context.Context, source
 		wg.RunAndWait()
 	}
 	return diagnostics
+}
+
+func (p *Program) collectCompilerCheckerDiagnosticsFromFiles(
+	ctx context.Context,
+	sourceFiles []*ast.SourceFile,
+	pool *checkerPool,
+	diagnostics [][]*ast.Diagnostic,
+	collect func(context.Context, *checker.Checker, *ast.SourceFile) []*ast.Diagnostic,
+) {
+	pool.forEachCheckerGroupDo(ctx, sourceFiles, p.SingleThreaded(), func(c *checker.Checker, fileIndex int, file *ast.SourceFile) {
+		diagnostics[fileIndex] = collect(ctx, c, file)
+	})
 }
 
 func (p *Program) GetSyntacticDiagnostics(ctx context.Context, sourceFile *ast.SourceFile) []*ast.Diagnostic {
@@ -808,6 +818,62 @@ func (p *Program) GetSemanticDiagnostics(ctx context.Context, sourceFile *ast.So
 	return p.collectCheckerDiagnostics(ctx, sourceFile, p.getSemanticDiagnosticsWithChecker)
 }
 
+// ArkTSBuildDiagnostics is the diagnostic product of the source-defined
+// ets2bundle build sequence. The ArkTS linter first computes the complete
+// non-strict program, then the syntactic program and strict linter program;
+// processBuildHap subsequently reads the already-computed non-strict result.
+type ArkTSBuildDiagnostics struct {
+	Linter    []*ast.Diagnostic
+	Syntactic []*ast.Diagnostic
+	Semantic  []*ast.Diagnostic
+}
+
+// GetArkTSBuildDiagnostics preserves
+// ArkTSLinter_1_1/TSDiagnostics.ts::doAllGetDiagnostics followed by
+// ets_checker.ts::processBuildHap without checking the non-strict program a
+// second time at the process API boundary.
+func (p *Program) GetArkTSBuildDiagnostics(ctx context.Context) *ArkTSBuildDiagnostics {
+	files := p.files
+	semanticFiles := files
+	if p.Options().StrictCheckerOnly.IsTrue() {
+		semanticFiles = core.Filter(files, func(file *ast.SourceFile) bool {
+			return file.ScriptKind != core.ScriptKindETS
+		})
+	}
+	semanticGroups := make([][]*ast.Diagnostic, len(semanticFiles))
+	if p.compilerCheckerPool != nil {
+		p.collectCompilerCheckerDiagnosticsFromFiles(ctx, semanticFiles, p.compilerCheckerPool, semanticGroups, p.getSemanticDiagnosticsWithChecker)
+	} else {
+		// API projects normally use the service checker pool, whose diagnostic
+		// lease is intentionally single-checker for LSP ordering. A build is the
+		// compiler workload: use Corsa's dependency-partitioned compiler pool and
+		// merge into source indexes exactly as the command-line Program does.
+		// Keep the pool scoped to this phase so its type caches are reclaimed
+		// before the independent strict-linter pool is populated.
+		buildPool := newCheckerPool(p)
+		p.collectCompilerCheckerDiagnosticsFromFiles(ctx, semanticFiles, buildPool, semanticGroups, p.getSemanticDiagnosticsWithChecker)
+	}
+	semanticByFile := make(map[*ast.SourceFile][]*ast.Diagnostic, len(semanticFiles))
+	for index, file := range semanticFiles {
+		semanticByFile[file] = semanticGroups[index]
+	}
+	semantic := filterAndSortDiagnostics(slices.Concat(semanticGroups...))
+
+	// TSDiagnostics.ts computes syntactic diagnostics between the normal and
+	// strict semantic programs. Retain that execution order while exposing the
+	// source-owned processBuildHap presentation order to the caller.
+	syntactic := p.GetSyntacticDiagnostics(ctx, nil)
+	var linter []*ast.Diagnostic
+	if p.Options().NeedDoArkTsLinter == core.TSTrue {
+		linter = p.getArkTSLinterDiagnostics(ctx, files, semanticByFile)
+	}
+	return &ArkTSBuildDiagnostics{
+		Linter:    linter,
+		Syntactic: syntactic,
+		Semantic:  semantic,
+	}
+}
+
 // GetArkTSLinterDiagnostics runs the ArkTS 1.1 linter as the independent
 // diagnostics phase used by developtools_ace_ets2bundle. Ordinary semantic
 // diagnostics remain available through GetSemanticDiagnostics and are not
@@ -835,7 +901,14 @@ func (p *Program) GetArkTSLinterDiagnostics(ctx context.Context, sourceFile *ast
 			normalDiagnostics[file] = groups[index]
 		}
 	}
+	return p.getArkTSLinterDiagnostics(ctx, files, normalDiagnostics)
+}
 
+func (p *Program) getArkTSLinterDiagnostics(
+	ctx context.Context,
+	files []*ast.SourceFile,
+	normalDiagnostics map[*ast.SourceFile][]*ast.Diagnostic,
+) []*ast.Diagnostic {
 	result := make([][]*ast.Diagnostic, len(files))
 	p.getArkTSLinterCheckerPool().forEachCheckerGroupDo(ctx, files, p.SingleThreaded(), func(strictChecker *checker.Checker, index int, file *ast.SourceFile) {
 		if !p.shouldRunArkTSLinter(file) {
