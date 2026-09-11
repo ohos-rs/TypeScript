@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
@@ -439,11 +440,11 @@ func TestOHSDKExternalSinceCompatibilityChecker(t *testing.T) {
 	}
 }
 
-// ArkTSLinter_1_1 creates a second strict checker by cloning compiler options.
-// SDK callback state belongs to the compiler host and must remain available to
-// that checker, otherwise HarmonyOS point versions fall back to integer
-// comparison and report false compatibility warnings.
-func TestOHSDKExternalSinceCompatibilityCheckerInArkTSLinter(t *testing.T) {
+// third_party_typescript checker.ts::createTypeChecker disables SDK JSDoc
+// callbacks on the second strict checker in a normal ArkTS linter build. The
+// complete build diagnostic sequence must invoke the SDK checker only from the
+// first, non-strict semantic pass.
+func TestOHSDKExternalSinceCompatibilityCheckerRunsOnceBeforeArkTSLinter(t *testing.T) {
 	t.Parallel()
 	compatible := float64(17)
 	compile := float64(17)
@@ -463,10 +464,51 @@ func TestOHSDKExternalSinceCompatibilityCheckerInArkTSLinter(t *testing.T) {
 		OSName: "HarmonyOS", Tag: "since", Type: "CompatibilityCheck",
 		Path: "/sdk/since-checker.js", FunctionName: "checkSinceValue",
 	}}
-	options.SetOhSdkPluginExecutor(harmonySDKPluginExecutor{})
+	executor := &countingHarmonySDKPluginExecutor{}
+	options.SetOhSdkPluginExecutor(executor)
 	program := newOHSDKProgramWithOptions(fs, []string{"/sdk/@ohos.sample.d.ts", "/project/entry/src/main/ets/entry.ets"}, options)
-	if diagnostics := ohSDKDiagnostics(program.GetArkTSLinterDiagnostics(t.Context(), nil)); len(diagnostics) != 0 {
-		t.Fatalf("ArkTS linter external since-checker diagnostics = %v", diagnosticTexts(diagnostics))
+	diagnostics := program.GetArkTSBuildDiagnostics(t.Context())
+	if sdkDiagnostics := ohSDKDiagnostics(append(diagnostics.Semantic, diagnostics.Linter...)); len(sdkDiagnostics) != 0 {
+		t.Fatalf("ArkTS build external since-checker diagnostics = %v", diagnosticTexts(sdkDiagnostics))
+	}
+	if calls := executor.valueCalls.Load(); calls != 1 {
+		t.Fatalf("external since-checker calls = %d, want 1", calls)
+	}
+}
+
+// checker.ts keeps getJsDocNodeCheckedConfig on the strict checker when
+// strictCheckerOnly is enabled. In that mode the ordinary ETS semantic pass is
+// skipped and the one SDK invocation belongs to the strict semantic pass.
+func TestOHSDKExternalSinceCompatibilityCheckerRunsInStrictCheckerOnly(t *testing.T) {
+	t.Parallel()
+	compatible := float64(17)
+	compile := float64(17)
+	fs := bundled.WrapFS(vfstest.FromMap(map[string]string{
+		"/sdk/@ohos.sample.d.ts": `/**
+             * @since 11
+             * @syscap SystemCapability.Base
+             */ declare function current(): void;`,
+		"/project/entry/src/main/ets/entry.ets": `current();`,
+	}, true))
+	options := ohSDKJSDocOptions(&compatible, &compile)
+	options.NeedDoArkTsLinter = core.TSTrue
+	options.StrictCheckerOnly = core.TSTrue
+	options.OhRuntimeOS = "HarmonyOS"
+	options.OhDeviceTypes = nil
+	options.OhOriginCompatibleSdkVersion = "5.0.5(17)"
+	options.OhSdkCheckPlugins = []core.OhSdkCheckPlugin{{
+		OSName: "HarmonyOS", Tag: "since", Type: "CompatibilityCheck",
+		Path: "/sdk/since-checker.js", FunctionName: "checkSinceValue",
+	}}
+	executor := &countingHarmonySDKPluginExecutor{}
+	options.SetOhSdkPluginExecutor(executor)
+	program := newOHSDKProgramWithOptions(fs, []string{"/sdk/@ohos.sample.d.ts", "/project/entry/src/main/ets/entry.ets"}, options)
+	diagnostics := program.GetArkTSBuildDiagnostics(t.Context())
+	if sdkDiagnostics := ohSDKDiagnostics(append(diagnostics.Semantic, diagnostics.Linter...)); len(sdkDiagnostics) != 0 {
+		t.Fatalf("strict-only external since-checker diagnostics = %v", diagnosticTexts(sdkDiagnostics))
+	}
+	if calls := executor.valueCalls.Load(); calls != 1 {
+		t.Fatalf("strict-only external since-checker calls = %d, want 1", calls)
 	}
 }
 
@@ -801,11 +843,21 @@ func ohDiagnosticText(diagnostic *ast.Diagnostic) string {
 
 type harmonySDKPluginExecutor struct{}
 
+type countingHarmonySDKPluginExecutor struct {
+	harmonySDKPluginExecutor
+	valueCalls atomic.Int32
+}
+
 type apiAvailableGuardSDKPluginExecutor struct{}
 
 type syscapSDKPluginExecutor struct{ harmonySDKPluginExecutor }
 
 type distributionFailureSDKPluginExecutor struct{ harmonySDKPluginExecutor }
+
+func (e *countingHarmonySDKPluginExecutor) CheckValue(plugin core.OhSdkCheckPlugin, required string, target string, scene int) (core.OhSdkPluginCheckResult, bool, error) {
+	e.valueCalls.Add(1)
+	return e.harmonySDKPluginExecutor.CheckValue(plugin, required, target, scene)
+}
 
 func (distributionFailureSDKPluginExecutor) CheckDistribution(plugin core.OhSdkCheckPlugin, version string) (core.OhSdkPluginDistributionResult, bool, error) {
 	if plugin.FunctionName == "loadFailure" {

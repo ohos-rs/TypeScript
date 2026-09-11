@@ -892,7 +892,7 @@ func (p *Program) GetArkTSBuildDiagnostics(ctx context.Context) *ArkTSBuildDiagn
 	syntactic := p.GetSyntacticDiagnostics(ctx, nil)
 	var linter []*ast.Diagnostic
 	if p.Options().NeedDoArkTsLinter == core.TSTrue {
-		linter = p.getArkTSLinterDiagnostics(ctx, files, semanticByFile)
+		linter = p.getArkTSLinterDiagnostics(ctx, files, semanticByFile, buildPool)
 	}
 	return &ArkTSBuildDiagnostics{
 		Linter:    linter,
@@ -928,16 +928,50 @@ func (p *Program) GetArkTSLinterDiagnostics(ctx context.Context, sourceFile *ast
 			normalDiagnostics[file] = groups[index]
 		}
 	}
-	return p.getArkTSLinterDiagnostics(ctx, files, normalDiagnostics)
+	return p.getArkTSLinterDiagnostics(ctx, files, normalDiagnostics, p.getArkTSBuildCheckerPool())
+}
+
+// resetOHSDKJSDocChecks mirrors LinterRunner.ts::runArkTSLinter, which calls
+// resetJsDocCheck on the normal and strict type checkers immediately after
+// doAllGetDiagnostics. Later linter collection and build transforms reuse the
+// populated type caches without invoking SDK JSDoc hooks again.
+func (p *Program) resetOHSDKJSDocChecks(normalPool *checkerPool, strictPool *checkerPool) {
+	normalPool.forEachCheckerParallel(func(_ int, c *checker.Checker) {
+		c.ResetOHSDKJSDocCheck()
+	})
+	strictPool.forEachCheckerParallel(func(_ int, c *checker.Checker) {
+		c.ResetOHSDKJSDocCheck()
+	})
 }
 
 func (p *Program) getArkTSLinterDiagnostics(
 	ctx context.Context,
 	files []*ast.SourceFile,
 	normalDiagnostics map[*ast.SourceFile][]*ast.Diagnostic,
+	normalPool *checkerPool,
 ) []*ast.Diagnostic {
+	strictPool := p.getArkTSLinterCheckerPool()
+	strictByFile := make([][]*ast.Diagnostic, len(files))
+	strictPool.forEachCheckerGroupDo(ctx, files, p.SingleThreaded(), func(strictChecker *checker.Checker, index int, file *ast.SourceFile) {
+		if !p.shouldRunArkTSLinter(file) || file.ScriptKind == core.ScriptKindTS {
+			return
+		}
+		strictDiagnostics := p.getSemanticDiagnosticsWithChecker(ctx, strictChecker, file)
+		if !p.Options().StrictCheckerOnly.IsTrue() {
+			strictDiagnostics = arkTSStrictOnlyDiagnostics(strictDiagnostics, normalDiagnostics[file])
+		} else {
+			strictDiagnostics = core.Filter(strictDiagnostics, func(diagnostic *ast.Diagnostic) bool {
+				return diagnostic.Pos() != 0 || diagnostic.Len() != 0
+			})
+		}
+		strictByFile[index] = strictDiagnostics
+	})
+
+	// LinterRunner.ts resets both checker callback surfaces after the two
+	// semantic passes and before visiting files with the standalone linter.
+	p.resetOHSDKJSDocChecks(normalPool, strictPool)
 	result := make([][]*ast.Diagnostic, len(files))
-	p.getArkTSLinterCheckerPool().forEachCheckerGroupDo(ctx, files, p.SingleThreaded(), func(strictChecker *checker.Checker, index int, file *ast.SourceFile) {
+	strictPool.forEachCheckerGroupDo(ctx, files, p.SingleThreaded(), func(strictChecker *checker.Checker, index int, file *ast.SourceFile) {
 		if !p.shouldRunArkTSLinter(file) {
 			return
 		}
@@ -949,16 +983,7 @@ func (p *Program) getArkTSLinterDiagnostics(
 			return
 		}
 
-		strictDiagnostics := p.getSemanticDiagnosticsWithChecker(ctx, strictChecker, file)
-		strictOnly := strictDiagnostics
-		if !p.Options().StrictCheckerOnly.IsTrue() {
-			strictOnly = arkTSStrictOnlyDiagnostics(strictDiagnostics, normalDiagnostics[file])
-		} else {
-			strictOnly = core.Filter(strictOnly, func(diagnostic *ast.Diagnostic) bool {
-				return diagnostic.Pos() != 0 || diagnostic.Len() != 0
-			})
-		}
-		result[index] = strictChecker.GetArkTSLinterDiagnostics(file, strictOnly)
+		result[index] = strictChecker.GetArkTSLinterDiagnostics(file, strictByFile[index])
 	})
 	// ArkTSLinter_1_1/LinterRunner.ts preserves checker/linter production order.
 	// In particular, a parent-node diagnostic may intentionally precede a child

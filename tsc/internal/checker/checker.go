@@ -590,6 +590,7 @@ type Checker struct {
 	etsLibFiles                                 map[string]struct{}
 	throws                                      *throwsChecker
 	ohAvailableNodeChecks                       map[string]struct{}
+	ohSDKJSDocCheckEnabled                      bool
 	ohSDKUseFacts                               map[string]map[string]OHSDKUseFact
 	ohProjectFileCache                          map[string]bool
 	ohSDKDeclarationFileCache                   map[string]bool
@@ -941,6 +942,11 @@ func newChecker(program Program, options *core.CompilerOptions, isForArkTSLinter
 	c.program = program
 	c.compilerOptions = options
 	c.isForArkTSLinter = isForArkTSLinter
+	// third_party_typescript/src/compiler/checker.ts::createTypeChecker clears
+	// getJsDocNodeCheckedConfig on the strict linter checker unless the build is
+	// strictCheckerOnly. Source-retention and apiAvailable callbacks remain
+	// independent and therefore are not disabled here.
+	c.ohSDKJSDocCheckEnabled = !isForArkTSLinter || options.StrictCheckerOnly.IsTrue()
 	c.files = program.SourceFiles()
 	c.initializeEtsLibFiles()
 	c.fileIndexMap = createFileIndexMap(c.files)

@@ -276,9 +276,9 @@ func (options *CompilerOptions) Clone() *CompilerOptions {
 		}
 	}
 	// The OH SDK callback executor is build-host state rather than a serialized
-	// compiler option, but the ArkTS 1.1 linter creates a strict checker from a
-	// cloned option set. Keep the same synchronous executor so that both the
-	// normal and strict checkers use the SDK-owned version/syscap callbacks.
+	// compiler option. The strictCheckerOnly source path may use it from the
+	// linter checker; the normal linter path disables only its JSDoc callback
+	// entry points inside checker.createTypeChecker.
 	target.ohSdkPluginExecutor = options.ohSdkPluginExecutor
 
 	return target

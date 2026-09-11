@@ -79,7 +79,7 @@ func (c *Checker) OHSDKUseFacts(fileName string) []OHSDKUseFact {
 }
 
 func (c *Checker) checkOHSDKIdentifierUse(node *ast.Node, symbol *ast.Symbol) {
-	if node == nil || node.Virtual || symbol == nil || symbol.ValueDeclaration == nil {
+	if !c.ohSDKJSDocCheckEnabled || node == nil || node.Virtual || symbol == nil || symbol.ValueDeclaration == nil {
 		return
 	}
 	for _, declaration := range symbol.Declarations {
@@ -88,7 +88,7 @@ func (c *Checker) checkOHSDKIdentifierUse(node *ast.Node, symbol *ast.Symbol) {
 }
 
 func (c *Checker) checkOHSDKPropertyUse(node *ast.Node, symbol *ast.Symbol) {
-	if node == nil || symbol == nil || symbol.ValueDeclaration == nil || len(symbol.Declarations) >= 2 {
+	if !c.ohSDKJSDocCheckEnabled || node == nil || symbol == nil || symbol.ValueDeclaration == nil || len(symbol.Declarations) >= 2 {
 		return
 	}
 	for _, declaration := range symbol.Declarations {
@@ -97,7 +97,7 @@ func (c *Checker) checkOHSDKPropertyUse(node *ast.Node, symbol *ast.Symbol) {
 }
 
 func (c *Checker) checkOHSDKOverloadUse(node *ast.Node, declaration *ast.Node) {
-	if node == nil || declaration == nil || !ast.IsPropertyAccessExpression(node.Expression()) {
+	if !c.ohSDKJSDocCheckEnabled || node == nil || declaration == nil || !ast.IsPropertyAccessExpression(node.Expression()) {
 		return
 	}
 	name := node.Expression().Name()
@@ -106,6 +106,14 @@ func (c *Checker) checkOHSDKOverloadUse(node *ast.Node, declaration *ast.Node) {
 		return
 	}
 	c.checkOHSDKDeclarationUse(name, declaration)
+}
+
+// ResetOHSDKJSDocCheck mirrors checker.ts::resetJsDocCheck. The ArkTS linter
+// runs the complete normal/strict diagnostic passes before disabling this
+// source-owned JSDoc callback surface for later diagnostic reads and transform
+// type queries on the same Program.
+func (c *Checker) ResetOHSDKJSDocCheck() {
+	c.ohSDKJSDocCheckEnabled = false
 }
 
 func (c *Checker) checkOHSDKDeclarationUse(node *ast.Node, declaration *ast.Node) {
