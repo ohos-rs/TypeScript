@@ -229,6 +229,15 @@ as JavaScript `Set` objects. The worker loads the OH TypeScript runtime from
 `etsLoaderPath/node_modules/typescript`, matching the SDK layout installed by
 `developtools_ace_ets2bundle/install_arkguard_tsc_declgen.py`.
 
+API build diagnostics use the compiler's dependency-partitioned normal checker
+pool and retain that pool for the immutable Program lifetime. Batched ArkTS
+transform facts run on the same file/checker associations, so they reuse the
+types populated by diagnostics instead of constructing a second service
+checker. The strict ArkTS linter keeps its independent checker pool, matching
+the source's separate linter program. Parallel fact responses are written by
+their original request index; concurrency therefore does not change the public
+ordering.
+
 The following source changes are deliberately not separate TSGO capabilities:
 
 - JavaScript lowering, annotation metadata emission, ArkUI runtime transforms,

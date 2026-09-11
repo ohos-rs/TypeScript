@@ -125,6 +125,14 @@ type Program struct {
 
 	arkTSLinterCheckerPoolOnce sync.Once
 	arkTSLinterCheckerPool     *checkerPool
+
+	// API projects use the project-system pool for interactive queries, but an
+	// ArkTS build is a compiler workload. Keep its dependency-partitioned normal
+	// checker pool for the Program lifetime so post-diagnostic transform queries
+	// observe the same populated type caches as the source build's global
+	// Program/typeChecker. The independent strict-linter pool remains separate.
+	arkTSBuildCheckerPoolOnce sync.Once
+	arkTSBuildCheckerPool     *checkerPool
 }
 
 // FileExists implements checker.Program.
@@ -596,6 +604,28 @@ func (p *Program) getArkTSLinterCheckerPool() *checkerPool {
 	return p.arkTSLinterCheckerPool
 }
 
+func (p *Program) getArkTSBuildCheckerPool() *checkerPool {
+	if p.compilerCheckerPool != nil {
+		return p.compilerCheckerPool
+	}
+	p.arkTSBuildCheckerPoolOnce.Do(func() {
+		p.arkTSBuildCheckerPool = newCheckerPool(p)
+	})
+	return p.arkTSBuildCheckerPool
+}
+
+// ForEachArkTSBuildCheckerGroup runs one callback per selected file on the
+// normal checker assigned by the compiler's dependency partition. Result
+// storage belongs to the caller and must be indexed by fileIndex so merging
+// remains deterministic in the original input order.
+func (p *Program) ForEachArkTSBuildCheckerGroup(
+	ctx context.Context,
+	files []*ast.SourceFile,
+	cb func(c *checker.Checker, fileIndex int, file *ast.SourceFile),
+) {
+	p.getArkTSBuildCheckerPool().forEachCheckerGroupDo(ctx, files, p.SingleThreaded(), cb)
+}
+
 func (p *Program) ForEachCheckerParallel(cb func(idx int, c *checker.Checker)) {
 	if p.compilerCheckerPool != nil {
 		p.compilerCheckerPool.forEachCheckerParallel(cb)
@@ -841,18 +871,15 @@ func (p *Program) GetArkTSBuildDiagnostics(ctx context.Context) *ArkTSBuildDiagn
 		})
 	}
 	semanticGroups := make([][]*ast.Diagnostic, len(semanticFiles))
-	if p.compilerCheckerPool != nil {
-		p.collectCompilerCheckerDiagnosticsFromFiles(ctx, semanticFiles, p.compilerCheckerPool, semanticGroups, p.getSemanticDiagnosticsWithChecker)
-	} else {
-		// API projects normally use the service checker pool, whose diagnostic
-		// lease is intentionally single-checker for LSP ordering. A build is the
-		// compiler workload: use Corsa's dependency-partitioned compiler pool and
-		// merge into source indexes exactly as the command-line Program does.
-		// Keep the pool scoped to this phase so its type caches are reclaimed
-		// before the independent strict-linter pool is populated.
-		buildPool := newCheckerPool(p)
-		p.collectCompilerCheckerDiagnosticsFromFiles(ctx, semanticFiles, buildPool, semanticGroups, p.getSemanticDiagnosticsWithChecker)
-	}
+	// API projects normally use the service checker pool, whose diagnostic
+	// lease is intentionally single-checker for LSP ordering. A build is the
+	// compiler workload: use Corsa's dependency-partitioned compiler pool and
+	// merge into source indexes exactly as the command-line Program does. The
+	// pool remains attached to this immutable Program so subsequent ArkTS
+	// transform facts reuse the normal diagnostic caches, as ets_checker.ts does
+	// through its one global Program/typeChecker.
+	buildPool := p.getArkTSBuildCheckerPool()
+	p.collectCompilerCheckerDiagnosticsFromFiles(ctx, semanticFiles, buildPool, semanticGroups, p.getSemanticDiagnosticsWithChecker)
 	semanticByFile := make(map[*ast.SourceFile][]*ast.Diagnostic, len(semanticFiles))
 	for index, file := range semanticFiles {
 		semanticByFile[file] = semanticGroups[index]

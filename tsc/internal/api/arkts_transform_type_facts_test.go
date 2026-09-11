@@ -12,6 +12,7 @@ import (
 func TestArkTSTransformTypeFactsAPI(t *testing.T) {
 	const file = "/entry.ets"
 	const sdk = "/sdk/@ohos.sample.d.ts"
+	const unused = "/unused.ets"
 	const source = `class MutableBuilder { builder(): void {} }
 type PrimitiveAlias = string | number;
 type BuilderAlias = MutableBuilder;
@@ -26,14 +27,15 @@ class Holder {
 /** @crossplatform */ interface Client { /** @crossplatform */ run(): void; }
 /** @crossplatform */ function create(): Client;
 }`,
-		file: source,
+		file:   source,
+		unused: `class Unused { value: string = "unused"; }`,
 	})
 	defer ps.Close()
 	s := NewLSPSession(ps, nil)
 	defer s.Close()
 	ctx := t.Context()
 	created, err := s.handleCreateProgram(ctx, &CreateProgramParams{
-		RootFiles: []DocumentIdentifier{{FileName: sdk}, {FileName: file}},
+		RootFiles: []DocumentIdentifier{{FileName: sdk}, {FileName: file}, {FileName: unused}},
 		CreateProgramOptions: CreateProgramOptions{CompilerOptions: core.CompilerOptions{
 			NoEmit:               core.TSTrue,
 			EtsAnnotationsEnable: core.TSTrue,
@@ -59,7 +61,7 @@ class Holder {
 			BuilderAccesses: []*ArkTSTypeQueryRange{rangeOf("this.content.builder")},
 			MemberAccesses:  []*ArkTSTypeQueryRange{rangeOf("Color.Red")},
 		}},
-		SDKApiUseFiles: []DocumentIdentifier{{FileName: file}},
+		SDKApiUseFiles: []DocumentIdentifier{{FileName: file}, {FileName: unused}},
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, len(infos), 1)
@@ -82,4 +84,53 @@ class Holder {
 	assert.Equal(t, infos[0].SDKApiUses[0].Function, "Client#run")
 	assert.Equal(t, infos[0].SDKApiUses[1].Function, "create")
 	assert.Equal(t, infos[0].SDKApiUses[2].Function, "sample")
+}
+
+func TestArkTSTransformTypeFactsPreserveQueryOrderAcrossCheckerGroups(t *testing.T) {
+	const first = "/first.ets"
+	const second = "/second.ets"
+	const firstSource = `class First { value: string = "first"; }`
+	const secondSource = `class Second { value: number = 2; }`
+	ps, _ := projecttestutil.Setup(map[string]any{
+		first:  firstSource,
+		second: secondSource,
+	})
+	defer ps.Close()
+	s := NewLSPSession(ps, nil)
+	defer s.Close()
+	checkerCount := 2
+	created, err := s.handleCreateProgram(t.Context(), &CreateProgramParams{
+		RootFiles: []DocumentIdentifier{{FileName: first}, {FileName: second}},
+		CreateProgramOptions: CreateProgramOptions{CompilerOptions: core.CompilerOptions{
+			NoEmit:   core.TSTrue,
+			Checkers: &checkerCount,
+		}},
+	})
+	assert.NilError(t, err)
+	query := func(file string, source string) *ArkTSTransformTypeFactsFileQuery {
+		pos := strings.Index(source, "value")
+		assert.Assert(t, pos >= 0)
+		return &ArkTSTransformTypeFactsFileQuery{
+			File: DocumentIdentifier{FileName: file},
+			Properties: []*ArkTSTypeQueryRange{{
+				Pos: int(core.UTF16Len(source[:pos])),
+				End: int(core.UTF16Len(source[:pos+len("value")])),
+			}},
+		}
+	}
+
+	infos, err := s.handleGetArkTSTransformTypeFacts(t.Context(), &ArkTSTransformTypeFactsParams{
+		Snapshot: created.Snapshot,
+		Project:  created.Project.Id,
+		Queries: []*ArkTSTransformTypeFactsFileQuery{
+			query(second, secondSource),
+			query(first, firstSource),
+		},
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, len(infos), 2)
+	assert.Equal(t, infos[0].FileName, second)
+	assert.Equal(t, infos[1].FileName, first)
+	assert.Assert(t, infos[0].Properties[0].Type.IsBasic)
+	assert.Assert(t, infos[1].Properties[0].Type.IsBasic)
 }

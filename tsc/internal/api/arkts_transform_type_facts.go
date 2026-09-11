@@ -118,41 +118,54 @@ func (s *Session) handleGetArkTSTransformTypeFacts(ctx context.Context, params *
 	if err != nil {
 		return nil, err
 	}
-	result := make([]*ArkTSTransformTypeFactsResponse, 0, len(params.Queries))
-	responses := make(map[string]*ArkTSTransformTypeFactsResponse, len(params.Queries))
+	queries := make([]*ArkTSTransformTypeFactsFileQuery, 0, len(params.Queries))
+	queryFiles := make([]*ast.SourceFile, 0, len(params.Queries))
 	for _, query := range params.Queries {
 		sourceFile := program.GetSourceFile(query.File.ToFileName())
 		if sourceFile == nil {
 			continue
 		}
-		fileChecker, done := program.GetTypeCheckerForFileExclusive(ctx, sourceFile)
-		response := arkTSTransformTypeFactsResponse(fileChecker, sourceFile, query)
-		done()
-		result = append(result, response)
-		responses[sourceFile.FileName()] = response
+		queries = append(queries, query)
+		queryFiles = append(queryFiles, sourceFile)
 	}
+	result := make([]*ArkTSTransformTypeFactsResponse, len(queryFiles))
+	program.ForEachArkTSBuildCheckerGroup(ctx, queryFiles, func(fileChecker *checker.Checker, index int, sourceFile *ast.SourceFile) {
+		result[index] = arkTSTransformTypeFactsResponse(fileChecker, sourceFile, queries[index])
+	})
+	responseIndexes := make(map[string]int, len(result))
+	for index, response := range result {
+		responseIndexes[response.FileName] = index
+	}
+
 	// SDK API use facts belong to the checker instance. They cannot be reused
-	// from the preceding diagnostics lease, so cross-platform builds check only
-	// their explicitly selected implementation files here. Normal builds pass
-	// no SDKApiUseFiles and perform no duplicate diagnostic work.
+	// across checker instances, so cross-platform builds collect them from the
+	// same compiler checker partition that owns diagnostics and transform type
+	// queries. Normal builds pass no SDKApiUseFiles and perform no extra work.
+	sdkFiles := make([]*ast.SourceFile, 0, len(params.SDKApiUseFiles))
 	for _, file := range params.SDKApiUseFiles {
 		sourceFile := program.GetSourceFile(file.ToFileName())
 		if sourceFile == nil {
 			continue
 		}
-		fileChecker, done := program.GetTypeCheckerForFileExclusive(ctx, sourceFile)
+		sdkFiles = append(sdkFiles, sourceFile)
+	}
+	sdkUses := make([][]checker.OHSDKUseFact, len(sdkFiles))
+	program.ForEachArkTSBuildCheckerGroup(ctx, sdkFiles, func(fileChecker *checker.Checker, index int, sourceFile *ast.SourceFile) {
 		fileChecker.GetDiagnostics(ctx, sourceFile)
-		uses := fileChecker.OHSDKUseFacts(sourceFile.FileName())
-		done()
+		sdkUses[index] = fileChecker.OHSDKUseFacts(sourceFile.FileName())
+	})
+	for index, uses := range sdkUses {
 		if len(uses) == 0 {
 			continue
 		}
-		response := responses[sourceFile.FileName()]
-		if response == nil {
-			response = newArkTSTransformTypeFactsResponse(sourceFile.FileName())
-			responses[sourceFile.FileName()] = response
-			result = append(result, response)
+		fileName := sdkFiles[index].FileName()
+		responseIndex, ok := responseIndexes[fileName]
+		if !ok {
+			responseIndex = len(result)
+			responseIndexes[fileName] = responseIndex
+			result = append(result, newArkTSTransformTypeFactsResponse(fileName))
 		}
+		response := result[responseIndex]
 		for _, fact := range uses {
 			response.SDKApiUses = append(response.SDKApiUses, &ArkTSSDKApiUseResponse{
 				ApiModule: fact.ApiModule,
