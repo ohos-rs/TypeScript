@@ -42,8 +42,7 @@ func (p *Parser) addArkUIReadonly(modifiers *ast.ModifierList) *ast.ModifierList
 	if !env && (!param || once) {
 		return modifiers
 	}
-	readonly := p.factory.NewModifier(ast.KindReadonlyKeyword)
-	readonly.Loc = core.NewTextRange(p.nodePos(), p.nodePos())
+	readonly := p.finishEtsVirtualNode(p.factory.NewModifier(ast.KindReadonlyKeyword), p.nodePos())
 	nodes := append(modifiers.Nodes, readonly)
 	return p.newModifierList(modifiers.Loc, p.nodeSliceArena.Clone(nodes))
 }
@@ -51,7 +50,7 @@ func (p *Parser) addArkUIReadonly(modifiers *ast.ModifierList) *ast.ModifierList
 // OH parseDeclaration/parseFunctionDeclaration/parseMethodDeclaration keep
 // component context distinct from configured build/builder callback context.
 func (p *Parser) enterEtsFunction(modifiers *ast.ModifierList, methodName string, method bool) func() {
-	ui, styles, expression, callback := p.arkUI, p.arkUIStyles, p.arkUIExpression, p.arkUICallback
+	ui, styles, callback := p.arkUI, p.arkUIStyles, p.arkUICallback
 	build, styleDecl, generic := p.arkUIBuild, p.arkUIStyleDeclaration, p.arkUIStyleGeneric
 	stateRoot := p.etsStateRoot
 	p.etsStateRoot = ""
@@ -104,9 +103,9 @@ func (p *Parser) enterEtsFunction(modifiers *ast.ModifierList, methodName string
 		}
 		p.arkUIStyles = p.arkUIStyleDeclaration != nil
 	}
-	p.arkUIExpression, p.arkUICallback = false, false
+	p.arkUICallback = false
 	return func() {
-		p.arkUI, p.arkUIStyles, p.arkUIExpression, p.arkUICallback = ui, styles, expression, callback
+		p.arkUI, p.arkUIStyles, p.arkUICallback = ui, styles, callback
 		p.arkUIBuild, p.arkUIStyleDeclaration, p.arkUIStyleGeneric = build, styleDecl, generic
 		p.etsStateRoot = stateRoot
 	}
@@ -163,11 +162,11 @@ func (p *Parser) addEtsStructConstructor(members *ast.NodeList, pos int) *ast.No
 		if !ast.IsPropertyDeclaration(member) {
 			continue
 		}
+		// The virtual signature mirrors the declaration, decorators included, so
+		// `@Require @Prop` survives for the build transform that enforces it.
 		var modifiers []*ast.Node
 		for _, modifier := range member.ModifierNodes() {
-			if !ast.IsDecorator(modifier) {
-				modifiers = append(modifiers, p.factory.DeepCloneReparse(modifier))
-			}
+			modifiers = append(modifiers, p.factory.DeepCloneReparse(modifier))
 		}
 		var modifierList *ast.ModifierList
 		if len(modifiers) != 0 {

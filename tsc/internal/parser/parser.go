@@ -68,7 +68,6 @@ type Parser struct {
 	arkUIStruct           bool
 	arkUI                 bool
 	arkUIStyles           bool
-	arkUIExpression       bool
 	arkUICallback         bool
 	arkUIBuild            bool
 	arkUIStyleDeclaration *core.EtsComponentDeclaration
@@ -1555,10 +1554,7 @@ func (p *Parser) parseExpressionOrLabeledStatement() *ast.Statement {
 	pos := p.nodePos()
 	jsdoc := p.jsdocScannerInfo()
 	hasParen := p.token == ast.KindOpenParenToken
-	savedExpression := p.arkUIExpression
-	p.arkUIExpression = p.arkUI
 	expression := p.parseExpression()
-	p.arkUIExpression = savedExpression
 
 	if expression.Kind == ast.KindIdentifier && p.parseOptional(ast.KindColonToken) {
 		result := p.finishNode(p.factory.NewLabeledStatement(expression, p.parseStatement()), pos)
@@ -5655,8 +5651,7 @@ func (p *Parser) parseCallExpressionRest(pos int, expression *ast.Expression) *a
 				expression = expression.AsExpressionWithTypeArguments().Expression
 			}
 			inner := expression
-			savedExpression, savedCallback, savedStyles := p.arkUIExpression, p.arkUICallback, p.arkUIStyles
-			p.arkUIExpression = false
+			savedCallback, savedStyles := p.arkUICallback, p.arkUIStyles
 			p.arkUICallback = (p.arkUIBuild || p.arkUIStyles) && p.isArkUIIteration(expression)
 			var stateProperty bool
 			typeArguments, stateProperty = p.etsAttributeArguments(expression, pos, typeArguments)
@@ -5664,7 +5659,7 @@ func (p *Parser) parseCallExpressionRest(pos int, expression *ast.Expression) *a
 			if stateProperty {
 				p.etsStateRoot = ""
 			}
-			p.arkUIExpression, p.arkUICallback, p.arkUIStyles = savedExpression, savedCallback, savedStyles
+			p.arkUICallback, p.arkUIStyles = savedCallback, savedStyles
 			isOptionalChain := questionDotToken != nil || p.tryReparseOptionalChain(expression)
 			expression = p.checkJSSyntax(p.finishNode(p.factory.NewCallExpression(expression, questionDotToken, typeArguments, argumentList, nil, core.IfElse(isOptionalChain, ast.NodeFlagsOptionalChain, ast.NodeFlagsNone)), pos))
 			p.unparseExpressionWithTypeArguments(inner, typeArguments, expression)
